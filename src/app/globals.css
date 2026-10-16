@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. Brand colours are CSS variables so admin-edited branding
+ * (settings/branding) can override them at runtime without a rebuild.
+ */
+:root {
+  --brand-primary: #15803d;
+  --brand-accent: #0e7490;
+
+  --background: #fafaf7;
+  --surface: #ffffff;
+  --foreground: #1c1917;
+  --muted: #57534e;
+  --border: #e7e5e4;
+  --danger: #b91c1c;
+  --success: #15803d;
+  --warning: #a16207;
+  --info: #0e7490;
+
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-primary: var(--brand-primary);
+  --color-primary-hover: color-mix(in oklab, var(--brand-primary) 82%, black);
+  --color-primary-soft: color-mix(in oklab, var(--brand-primary) 10%, white);
+  --color-accent: var(--brand-accent);
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+
+  /* --nf-* variables are provided by next/font in the root layout. */
+  --font-sans:
+    var(--nf-inter), var(--nf-thaana), ui-sans-serif, system-ui, sans-serif;
+  --font-thaana:
+    var(--nf-thaana), var(--nf-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* Thaana reads better a little larger with more line height. */
+html:lang(dv) body {
+  font-family: var(--font-thaana);
+  font-size: 1.0625rem;
+  line-height: 1.9;
+}
+
+/* Visible keyboard focus everywhere. */
+:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

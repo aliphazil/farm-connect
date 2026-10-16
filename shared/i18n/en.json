@@ -1,0 +1,125 @@
+{
+  "meta": {
+    "siteName": "FarmConnect Maldives",
+    "tagline": "Fresh produce direct from Maldivian farmers",
+    "description": "Buy fresh vegetables, fruit and more directly from farmers across the atolls of the Maldives."
+  },
+  "common": {
+    "skipToContent": "Skip to main content",
+    "language": "Language",
+    "menu": "Menu",
+    "closeMenu": "Close menu",
+    "mainNavigation": "Main navigation",
+    "portalNavigation": "Portal navigation",
+    "loading": "Loading…",
+    "save": "Save",
+    "cancel": "Cancel",
+    "submit": "Submit",
+    "back": "Back",
+    "required": "Required",
+    "optional": "Optional"
+  },
+  "nav": {
+    "home": "Home",
+    "marketplace": "Marketplace",
+    "farmers": "Farmers",
+    "signIn": "Sign in",
+    "register": "Register",
+    "farmerPortal": "Farmer portal",
+    "buyerPortal": "My account",
+    "adminPortal": "Admin"
+  },
+  "states": {
+    "errorTitle": "Something went wrong",
+    "errorBody": "Please try again. If the problem continues, contact us.",
+    "tryAgain": "Try again",
+    "notFoundTitle": "Page not found",
+    "notFoundBody": "The page you are looking for doesn't exist or has moved.",
+    "goHome": "Go to home page",
+    "comingSoon": "Coming soon"
+  },
+  "home": {
+    "heroTitle": "Fresh from Maldivian farms, straight to you",
+    "heroBody": "Find local produce from farmers across the atolls and contact them directly to arrange delivery.",
+    "browseCta": "Browse the marketplace",
+    "sellCta": "Sell your produce",
+    "howTitle": "How it works",
+    "how1Title": "Find produce",
+    "how1Body": "Search by product, atoll or island.",
+    "how2Title": "Contact the farmer",
+    "how2Body": "Send an enquiry or call or message them directly.",
+    "how3Title": "Arrange delivery",
+    "how3Body": "Agree delivery and payment with the farmer. Invoices are recorded on the platform."
+  },
+  "marketplace": {
+    "title": "Marketplace",
+    "intro": "Browse produce from farmers across the Maldives.",
+    "emptyTitle": "No listings yet",
+    "emptyBody": "Farmers are setting up. Check back soon."
+  },
+  "auth": {
+    "signInTitle": "Sign in",
+    "registerTitle": "Create an account",
+    "notReady": "Sign-in will be available in the next release."
+  },
+  "portal": {
+    "overview": "Overview",
+    "farmer": {
+      "title": "Farmer portal",
+      "listings": "My listings",
+      "enquiries": "Enquiries",
+      "invoices": "Invoices",
+      "payments": "Payments",
+      "profile": "Farm profile"
+    },
+    "buyer": {
+      "title": "My account",
+      "enquiries": "My enquiries",
+      "invoices": "My invoices",
+      "profile": "Profile"
+    },
+    "admin": {
+      "title": "Administration",
+      "users": "Users",
+      "listings": "Listings",
+      "reports": "Fraud reports",
+      "branding": "Branding",
+      "analytics": "Analytics"
+    },
+    "checkingAccess": "Checking your access…"
+  },
+  "categories": {
+    "vegetables": "Vegetables",
+    "leafy_greens": "Leafy greens",
+    "fruits": "Fruits",
+    "root_crops": "Root crops",
+    "herbs_spices": "Herbs & spices",
+    "coconut_products": "Coconut products",
+    "eggs": "Eggs",
+    "poultry": "Poultry",
+    "fish": "Fish",
+    "plants_seedlings": "Plants & seedlings",
+    "other": "Other"
+  },
+  "units": {
+    "kg": "kg",
+    "g": "g",
+    "piece": "piece",
+    "bunch": "bunch",
+    "dozen": "dozen",
+    "bag": "bag",
+    "box": "box",
+    "litre": "litre"
+  },
+  "validation": {
+    "required": "This field is required.",
+    "invalid_phone": "Enter a Maldivian phone number (7 digits).",
+    "invalid_email": "Enter a valid email address.",
+    "invalid_amount": "Enter an amount in MVR, e.g. 25.50.",
+    "invalid_color": "Enter a colour like #15803d."
+  },
+  "footer": {
+    "rights": "All rights reserved.",
+    "noOnlinePayments": "Payments are arranged directly between buyers and farmers."
+  }
+}

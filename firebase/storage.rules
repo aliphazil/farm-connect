@@ -1,0 +1,40 @@
+rules_version = '2';
+
+// FarmConnect Maldives — Cloud Storage Security Rules. Deny by default.
+// Keep paths in sync with shared/firestore-paths.ts (storagePaths).
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isActiveFarmer(uid) {
+      return request.auth != null
+        && request.auth.uid == uid
+        && request.auth.token.get('role', 'buyer') == 'farmer'
+        && request.auth.token.get('blocked', false) != true;
+    }
+    function isAllowedImage() {
+      return request.resource.contentType.matches('image/(jpeg|png|webp)')
+        && request.resource.size <= 5 * 1024 * 1024;
+    }
+
+    // Listing photos: public to view, writable only by the owning farmer.
+    match /listings/{farmerId}/{listingId}/{fileName} {
+      allow read: if true;
+      allow create, update: if isActiveFarmer(farmerId) && isAllowedImage();
+      allow delete: if isActiveFarmer(farmerId);
+    }
+
+    // Farm logos.
+    match /farmers/{farmerId}/{fileName} {
+      allow read: if true;
+      allow create, update: if isActiveFarmer(farmerId) && isAllowedImage();
+      allow delete: if isActiveFarmer(farmerId);
+    }
+
+    // Site branding assets are uploaded by server code (Admin SDK) only.
+    match /branding/{fileName} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

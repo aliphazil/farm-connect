@@ -1,0 +1,152 @@
+rules_version = '2';
+
+// FarmConnect Maldives — Firestore Security Rules
+//
+// Principles:
+// - Deny by default. Anything not matched below is denied.
+// - Roles come from Auth custom claims (`role`, `blocked`), set only by the Admin SDK.
+// - Privileged writes (accounts, roles, blocking, enquiries, invoices, payments,
+//   reports, branding, audit logs) go through trusted server code using the
+//   Admin SDK, which bypasses these rules. Clients cannot write those collections.
+// - A document's id is not stored in its data (see shared/firestore-paths.ts).
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+    function hasRole(r) {
+      return signedIn() && request.auth.token.get('role', 'buyer') == r;
+    }
+    function isAdmin() {
+      return hasRole('admin');
+    }
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+    // Claims can lag up to an hour after blocking, so writes also check the
+    // account document, which the server updates immediately.
+    function isActiveAccount() {
+      return signedIn()
+        && request.auth.token.get('blocked', false) != true
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active';
+    }
+    function isActiveFarmer() {
+      return hasRole('farmer') && isActiveAccount();
+    }
+    function stampedNow(field) {
+      return request.resource.data[field] == request.time;
+    }
+
+    // ---------- public reference data ----------
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /islands/{islandId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ---------- private account records ----------
+    match /users/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow write: if false;
+    }
+
+    // ---------- public farm profiles ----------
+    match /farmers/{uid} {
+      allow read: if resource.data.visible == true || isSelf(uid) || isAdmin();
+      // Created by the server when a farmer account is approved/onboarded.
+      allow create, delete: if false;
+      // Owners may edit descriptive fields only; `verified`/`visible` are admin-controlled.
+      allow update: if isSelf(uid)
+        && isActiveFarmer()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['farmName', 'bio', 'location', 'contact', 'deliveryDestinations', 'logoPath', 'updatedAt'])
+        && request.resource.data.farmName.en is string
+        && request.resource.data.farmName.en.size() > 0
+        && request.resource.data.farmName.en.size() <= 80
+        && request.resource.data.deliveryDestinations is list
+        && request.resource.data.deliveryDestinations.size() <= 50
+        && stampedNow('updatedAt');
+    }
+
+    // ---------- listings ----------
+    function validListing(d) {
+      return d.keys().hasAll(['farmerId', 'title', 'category', 'unit', 'priceLaari', 'quantityAvailable',
+                              'imagePaths', 'location', 'deliveryDestinations', 'status', 'createdAt', 'updatedAt'])
+        && d.keys().hasOnly(['farmerId', 'title', 'description', 'category', 'unit', 'priceLaari',
+                             'quantityAvailable', 'minOrderQuantity', 'imagePaths', 'location',
+                             'deliveryDestinations', 'status', 'availableFrom', 'createdAt', 'updatedAt'])
+        && d.title.en is string && d.title.en.size() > 0 && d.title.en.size() <= 100
+        && d.category in ['vegetables', 'leafy_greens', 'fruits', 'root_crops', 'herbs_spices',
+                          'coconut_products', 'eggs', 'poultry', 'fish', 'plants_seedlings', 'other']
+        && d.unit in ['kg', 'g', 'piece', 'bunch', 'dozen', 'bag', 'box', 'litre']
+        && d.priceLaari is int && d.priceLaari > 0
+        && d.quantityAvailable is number && d.quantityAvailable >= 0
+        && d.imagePaths is list && d.imagePaths.size() <= 6
+        && d.deliveryDestinations is list && d.deliveryDestinations.size() <= 50
+        // Farmers can't use 'removed' — that is an admin moderation state.
+        && d.status in ['draft', 'active', 'paused', 'sold_out'];
+    }
+    // Listing location must match the farm's location so marketplace filters are honest.
+    function matchesFarmLocation(d) {
+      return d.location == get(/databases/$(database)/documents/farmers/$(request.auth.uid)).data.location;
+    }
+
+    match /listings/{listingId} {
+      allow read: if resource.data.status == 'active'
+        || isSelf(resource.data.farmerId)
+        || isAdmin();
+      allow create: if isActiveFarmer()
+        && request.resource.data.farmerId == request.auth.uid
+        && validListing(request.resource.data)
+        && matchesFarmLocation(request.resource.data)
+        && stampedNow('createdAt')
+        && stampedNow('updatedAt');
+      allow update: if isActiveFarmer()
+        && isSelf(resource.data.farmerId)
+        && resource.data.status != 'removed'
+        && request.resource.data.farmerId == resource.data.farmerId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && validListing(request.resource.data)
+        && matchesFarmLocation(request.resource.data)
+        && stampedNow('updatedAt');
+      // Listings are never hard-deleted by clients; set status instead.
+      allow delete: if false;
+    }
+
+    // ---------- server-written records (read-only for clients) ----------
+    match /enquiries/{enquiryId} {
+      allow read: if signedIn()
+        && (resource.data.buyerId == request.auth.uid
+            || resource.data.farmerId == request.auth.uid
+            || isAdmin());
+      allow write: if false;
+    }
+    match /invoices/{invoiceId} {
+      allow read: if signedIn()
+        && (resource.data.farmerId == request.auth.uid
+            || resource.data.get('buyerId', null) == request.auth.uid
+            || isAdmin());
+      allow write: if false;
+    }
+    match /payments/{paymentId} {
+      allow read: if signedIn()
+        && (resource.data.farmerId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+    match /reports/{reportId} {
+      allow read: if signedIn()
+        && (resource.data.reporterId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+  }
+}
