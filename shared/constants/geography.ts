@@ -2,49 +2,107 @@
  * Maldivian administrative divisions.
  *
  * `code` is the stable key stored in Firestore — never change an existing code.
- * Names follow common official usage; Dhivehi spellings and the island list
- * should be reviewed by a local before launch. The full inhabited-island list
- * will live in Firestore (`islands` collection) so admins can maintain it; the
- * entries here are a seed of administrative capitals.
+ * The 20 administrative atolls plus Malé City are a fixed, official set.
+ * Islands are NOT hardcoded here: the app reads them from the normalised
+ * `islands` collection, imported from an official list
+ * (scripts/import-islands.mts). See sample-islands.ts for development data.
  */
 
 export type Atoll = {
   code: string;
   /** Official letter abbreviation, e.g. "HA", "K". */
   abbr: string;
+  /** Thaana letter abbreviation, e.g. "ހއ", "ކ". */
+  abbrDv: string;
   nameEn: string;
   nameDv: string;
 };
 
 export const ATOLLS = [
-  { code: "MLE", abbr: "Malé", nameEn: "Malé City", nameDv: "މާލެ ސިޓީ" },
-  { code: "HA", abbr: "HA", nameEn: "Haa Alif", nameDv: "ހާ އަލިފު" },
-  { code: "HDH", abbr: "HDh", nameEn: "Haa Dhaalu", nameDv: "ހާ ދާލު" },
-  { code: "SH", abbr: "Sh", nameEn: "Shaviyani", nameDv: "ށަވިޔަނި" },
-  { code: "N", abbr: "N", nameEn: "Noonu", nameDv: "ނޫނު" },
-  { code: "R", abbr: "R", nameEn: "Raa", nameDv: "ރާ" },
-  { code: "B", abbr: "B", nameEn: "Baa", nameDv: "ބާ" },
-  { code: "LH", abbr: "Lh", nameEn: "Lhaviyani", nameDv: "ޅަވިޔަނި" },
-  { code: "K", abbr: "K", nameEn: "Kaafu", nameDv: "ކާފު" },
-  { code: "AA", abbr: "AA", nameEn: "Alif Alif", nameDv: "އަލިފު އަލިފު" },
-  { code: "ADH", abbr: "ADh", nameEn: "Alif Dhaal", nameDv: "އަލިފު ދާލު" },
-  { code: "V", abbr: "V", nameEn: "Vaavu", nameDv: "ވާވު" },
-  { code: "M", abbr: "M", nameEn: "Meemu", nameDv: "މީމު" },
-  { code: "F", abbr: "F", nameEn: "Faafu", nameDv: "ފާފު" },
-  { code: "DH", abbr: "Dh", nameEn: "Dhaalu", nameDv: "ދާލު" },
-  { code: "TH", abbr: "Th", nameEn: "Thaa", nameDv: "ތާ" },
-  { code: "L", abbr: "L", nameEn: "Laamu", nameDv: "ލާމު" },
-  { code: "GA", abbr: "GA", nameEn: "Gaafu Alif", nameDv: "ގާފު އަލިފު" },
-  { code: "GDH", abbr: "GDh", nameEn: "Gaafu Dhaalu", nameDv: "ގާފު ދާލު" },
+  {
+    code: "MLE",
+    abbr: "Malé",
+    abbrDv: "މާލެ",
+    nameEn: "Malé City",
+    nameDv: "މާލެ ސިޓީ",
+  },
+  {
+    code: "HA",
+    abbr: "HA",
+    abbrDv: "ހއ",
+    nameEn: "Haa Alif",
+    nameDv: "ހާ އަލިފު",
+  },
+  {
+    code: "HDH",
+    abbr: "HDh",
+    abbrDv: "ހދ",
+    nameEn: "Haa Dhaalu",
+    nameDv: "ހާ ދާލު",
+  },
+  {
+    code: "SH",
+    abbr: "Sh",
+    abbrDv: "ށ",
+    nameEn: "Shaviyani",
+    nameDv: "ށަވިޔަނި",
+  },
+  { code: "N", abbr: "N", abbrDv: "ނ", nameEn: "Noonu", nameDv: "ނޫނު" },
+  { code: "R", abbr: "R", abbrDv: "ރ", nameEn: "Raa", nameDv: "ރާ" },
+  { code: "B", abbr: "B", abbrDv: "ބ", nameEn: "Baa", nameDv: "ބާ" },
+  {
+    code: "LH",
+    abbr: "Lh",
+    abbrDv: "ޅ",
+    nameEn: "Lhaviyani",
+    nameDv: "ޅަވިޔަނި",
+  },
+  { code: "K", abbr: "K", abbrDv: "ކ", nameEn: "Kaafu", nameDv: "ކާފު" },
+  {
+    code: "AA",
+    abbr: "AA",
+    abbrDv: "އއ",
+    nameEn: "Alif Alif",
+    nameDv: "އަލިފު އަލިފު",
+  },
+  {
+    code: "ADH",
+    abbr: "ADh",
+    abbrDv: "އދ",
+    nameEn: "Alif Dhaal",
+    nameDv: "އަލިފު ދާލު",
+  },
+  { code: "V", abbr: "V", abbrDv: "ވ", nameEn: "Vaavu", nameDv: "ވާވު" },
+  { code: "M", abbr: "M", abbrDv: "މ", nameEn: "Meemu", nameDv: "މީމު" },
+  { code: "F", abbr: "F", abbrDv: "ފ", nameEn: "Faafu", nameDv: "ފާފު" },
+  { code: "DH", abbr: "Dh", abbrDv: "ދ", nameEn: "Dhaalu", nameDv: "ދާލު" },
+  { code: "TH", abbr: "Th", abbrDv: "ތ", nameEn: "Thaa", nameDv: "ތާ" },
+  { code: "L", abbr: "L", abbrDv: "ލ", nameEn: "Laamu", nameDv: "ލާމު" },
+  {
+    code: "GA",
+    abbr: "GA",
+    abbrDv: "ގއ",
+    nameEn: "Gaafu Alif",
+    nameDv: "ގާފު އަލިފު",
+  },
+  {
+    code: "GDH",
+    abbr: "GDh",
+    abbrDv: "ގދ",
+    nameEn: "Gaafu Dhaalu",
+    nameDv: "ގާފު ދާލު",
+  },
   {
     code: "GN",
     abbr: "Gn",
+    abbrDv: "ޏ",
     nameEn: "Gnaviyani (Fuvahmulah)",
     nameDv: "ޏަވިޔަނި (ފުވައްމުލައް)",
   },
   {
     code: "S",
     abbr: "S",
+    abbrDv: "ސ",
     nameEn: "Seenu (Addu City)",
     nameDv: "ސީނު (އައްޑޫ ސިޓީ)",
   },
@@ -66,43 +124,33 @@ export type Island = {
   nameDv?: string;
 };
 
-/** Seed list: administrative capitals plus Malé's wards. Extend in Firestore. */
-export const SEED_ISLANDS: readonly Island[] = [
-  { id: "mle-male", atollCode: "MLE", nameEn: "Malé", nameDv: "މާލެ" },
-  {
-    id: "mle-hulhumale",
-    atollCode: "MLE",
-    nameEn: "Hulhumalé",
-    nameDv: "ހުޅުމާލެ",
-  },
-  {
-    id: "mle-villimale",
-    atollCode: "MLE",
-    nameEn: "Villimalé",
-    nameDv: "ވިލިމާލެ",
-  },
-  { id: "ha-dhidhdhoo", atollCode: "HA", nameEn: "Dhidhdhoo" },
-  { id: "hdh-kulhudhuffushi", atollCode: "HDH", nameEn: "Kulhudhuffushi" },
-  { id: "sh-funadhoo", atollCode: "SH", nameEn: "Funadhoo" },
-  { id: "n-manadhoo", atollCode: "N", nameEn: "Manadhoo" },
-  { id: "r-ungoofaaru", atollCode: "R", nameEn: "Ungoofaaru" },
-  { id: "b-eydhafushi", atollCode: "B", nameEn: "Eydhafushi" },
-  { id: "lh-naifaru", atollCode: "LH", nameEn: "Naifaru" },
-  { id: "k-thulusdhoo", atollCode: "K", nameEn: "Thulusdhoo" },
-  { id: "aa-rasdhoo", atollCode: "AA", nameEn: "Rasdhoo" },
-  { id: "adh-mahibadhoo", atollCode: "ADH", nameEn: "Mahibadhoo" },
-  { id: "v-felidhoo", atollCode: "V", nameEn: "Felidhoo" },
-  { id: "m-muli", atollCode: "M", nameEn: "Muli" },
-  { id: "f-nilandhoo", atollCode: "F", nameEn: "Nilandhoo" },
-  { id: "dh-kudahuvadhoo", atollCode: "DH", nameEn: "Kudahuvadhoo" },
-  { id: "th-veymandoo", atollCode: "TH", nameEn: "Veymandoo" },
-  { id: "l-fonadhoo", atollCode: "L", nameEn: "Fonadhoo" },
-  { id: "ga-villingili", atollCode: "GA", nameEn: "Villingili" },
-  { id: "gdh-thinadhoo", atollCode: "GDH", nameEn: "Thinadhoo" },
-  { id: "gn-fuvahmulah", atollCode: "GN", nameEn: "Fuvahmulah" },
-  { id: "s-hithadhoo", atollCode: "S", nameEn: "Hithadhoo" },
-];
-
 export function getAtoll(code: string): Atoll | undefined {
   return ATOLLS.find((a) => a.code === code);
+}
+
+export function atollName(atoll: Atoll, locale: "en" | "dv"): string {
+  return locale === "dv" ? atoll.nameDv : atoll.nameEn;
+}
+
+/** Dhivehi island names fall back to English until a Dhivehi name is recorded. */
+export function islandName(
+  island: { nameEn: string; nameDv?: string },
+  locale: "en" | "dv",
+): string {
+  return locale === "dv" ? (island.nameDv ?? island.nameEn) : island.nameEn;
+}
+
+/**
+ * "AA. Thoddoo" / "އއ. ތޮއްޑޫ" style label for an island whose names were
+ * resolved from the `islands` records. Malé City islands show without prefix.
+ */
+export function placeText(
+  place: { atollCode: string; islandEn: string; islandDv?: string },
+  locale: "en" | "dv",
+): string {
+  const name =
+    locale === "dv" ? (place.islandDv ?? place.islandEn) : place.islandEn;
+  const atoll = getAtoll(place.atollCode);
+  if (!atoll || atoll.code === "MLE") return name;
+  return `${locale === "dv" ? atoll.abbrDv : atoll.abbr}. ${name}`;
 }

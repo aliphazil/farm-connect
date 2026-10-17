@@ -4,10 +4,11 @@ import { describe, expect, it } from "vitest";
 
 const APP_DIR = join(__dirname, "../../app/[locale]");
 
+// Admin pages may use requireAdminPermission(...), which calls requireAdminPortal().
 const GUARDS = {
-  farmer: "requireFarmerPortal",
-  buyer: "requireBuyerPortal",
-  admin: "requireAdminPortal",
+  farmer: "requireFarmerPortal\\(\\)",
+  account: "requireConsumerPortal\\(\\)",
+  admin: "(requireAdminPortal\\(\\)|requireAdminPermission\\()",
 } as const;
 
 function pageFiles(dir: string): string[] {
@@ -27,9 +28,9 @@ describe("portal pages", () => {
     });
 
     for (const page of pages) {
-      it(`${page.slice(APP_DIR.length)} awaits ${guard}()`, () => {
+      it(`${page.slice(APP_DIR.length)} awaits its guard`, () => {
         expect(readFileSync(page, "utf8")).toMatch(
-          new RegExp(`await\\s+${guard}\\(\\)`),
+          new RegExp(`await\\s+${guard}`),
         );
       });
     }

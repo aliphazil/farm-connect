@@ -23,6 +23,16 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  async redirects() {
+    return [
+      // Phase 1 URL, renamed to /products.
+      {
+        source: "/:locale(en|dv)/marketplace",
+        destination: "/:locale/products",
+        permanent: true,
+      },
+    ];
+  },
   turbopack: {
     rules: {
       "*.css": {

@@ -1,34 +1,70 @@
 rules_version = '2';
 
 // FarmConnect Maldives — Cloud Storage Security Rules. Deny by default.
-// Keep paths in sync with shared/firestore-paths.ts (storagePaths).
+// Keep paths and limits in sync with shared/firestore-paths.ts
+// (storagePaths, UPLOAD_LIMITS).
+//
+// Uploads require: a signed-in, non-blocked farmer whose users/{uid}.status is
+// "active" (cross-service check against Firestore), writing under their own
+// uid, with an allowed content type, a size limit and a safe file name.
+//
+// NOTE: the Firestore cross-service check needs a one-time permission grant
+// in production (the Firebase console prompts for it when rules are deployed).
+//
+// Tests: tests/rules/storage.rules.test.ts  (npm run test:storage-rules)
 
 service firebase.storage {
   match /b/{bucket}/o {
 
-    function isActiveFarmer(uid) {
-      return request.auth != null
-        && request.auth.uid == uid
-        && request.auth.token.get('role', 'buyer') == 'farmer'
-        && request.auth.token.get('blocked', false) != true;
+    function signedIn() {
+      return request.auth != null;
     }
-    function isAllowedImage() {
-      return request.resource.contentType.matches('image/(jpeg|png|webp)')
-        && request.resource.size <= 5 * 1024 * 1024;
+    function notBlocked() {
+      return request.auth.token.get('blocked', false) != true;
+    }
+    function isAdmin() {
+      return signedIn() && request.auth.token.get('role', '') == 'admin' && notBlocked();
+    }
+    function isActiveFarmer(ownerId) {
+      return signedIn()
+        && request.auth.uid == ownerId
+        && request.auth.token.get('role', '') == 'farmer'
+        && notBlocked()
+        && firestore.get(/databases/(default)/documents/users/$(ownerId)).data.status == 'active';
+    }
+    function safeName(fileName) {
+      return fileName.matches('^[A-Za-z0-9._-]{1,100}$');
+    }
+    function isImage() {
+      return request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
+    function isProof() {
+      return request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)|application/pdf');
     }
 
-    // Listing photos: public to view, writable only by the owning farmer.
-    match /listings/{farmerId}/{listingId}/{fileName} {
+    // Product photos: public to view, writable only by the owning farmer.
+    match /products/{farmerId}/{productId}/{fileName} {
       allow read: if true;
-      allow create, update: if isActiveFarmer(farmerId) && isAllowedImage();
+      allow create, update: if isActiveFarmer(farmerId) && safeName(fileName) && isImage();
       allow delete: if isActiveFarmer(farmerId);
     }
 
     // Farm logos.
     match /farmers/{farmerId}/{fileName} {
       allow read: if true;
-      allow create, update: if isActiveFarmer(farmerId) && isAllowedImage();
+      allow create, update: if isActiveFarmer(farmerId) && safeName(fileName) && isImage();
       allow delete: if isActiveFarmer(farmerId);
+    }
+
+    // Payment proofs (transfer slips): private to the farmer and admins.
+    // Immutable once uploaded so they remain trustworthy evidence.
+    match /payments/{farmerId}/{paymentId}/{fileName} {
+      allow read: if (signedIn() && request.auth.uid == farmerId) || isAdmin();
+      // `resource == null`: only brand-new files; overwriting an existing proof is denied.
+      allow create: if resource == null && isActiveFarmer(farmerId) && safeName(fileName) && isProof();
+      allow update, delete: if false;
     }
 
     // Site branding assets are uploaded by server code (Admin SDK) only.

@@ -66,8 +66,22 @@ export function getAdminAuth(): Auth {
   return getAuth(initAdminApp());
 }
 
+let db: Firestore | undefined;
+
 export function getAdminDb(): Firestore {
-  return getFirestore(initAdminApp());
+  if (!db) {
+    db = getFirestore(initAdminApp());
+    // Optional fields may be undefined in domain objects; drop them on write.
+    // Next.js can load this module more than once (one copy per route bundle)
+    // while they share one Firebase app, so another copy may have applied the
+    // same settings already — that throws, and is safe to ignore.
+    try {
+      db.settings({ ignoreUndefinedProperties: true });
+    } catch {
+      // Already initialised with these settings by another module instance.
+    }
+  }
+  return db;
 }
 
 export function getAdminStorage(): Storage {

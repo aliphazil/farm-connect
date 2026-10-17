@@ -20,9 +20,12 @@ export function isLocale(value: unknown): value is Locale {
   );
 }
 
-/** Text stored in both languages. English is required; Dhivehi is optional. */
+/** Text in English and/or Dhivehi (at least one is non-empty). */
 export type LocalizedText = { en: string; dv?: string };
 
+/** The text in the reader's language, falling back to the other language. */
 export function pickLocalized(text: LocalizedText, locale: Locale): string {
-  return (locale === "dv" && text.dv?.trim()) || text.en;
+  const en = text.en.trim();
+  const dv = text.dv?.trim() ?? "";
+  return locale === "dv" ? dv || en : en || dv;
 }

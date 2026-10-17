@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Noto_Sans_Thaana } from "next/font/google";
 import { LOCALE_DIRECTION, LOCALES } from "@shared/constants/locales";
 import { getDictionary, getLocale } from "@/i18n/server";
+import { isSampleCatalog } from "@/features/catalog/queries";
+import { TrackVisit } from "@/components/catalog/track-visit";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import "../globals.css";
@@ -62,7 +64,8 @@ export default async function RootLayout({
         <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
           {children}
         </main>
-        <SiteFooter dict={dict} />
+        <SiteFooter locale={locale} dict={dict} />
+        {isSampleCatalog ? null : <TrackVisit locale={locale} />}
       </body>
     </html>
   );

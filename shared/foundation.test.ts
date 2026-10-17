@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { ATOLLS, SEED_ISLANDS } from "./constants/geography";
+import { ATOLLS } from "./constants/geography";
+import { SAMPLE_ISLANDS } from "./constants/sample-islands";
 import { PRODUCT_CATEGORIES, PRODUCT_UNITS } from "./constants/catalog";
 import { dictionaries } from "./i18n";
-import { listingInputSchema, mvPhoneSchema } from "./schemas";
+import { productInputSchema, mvPhoneSchema } from "./schemas";
 
 function keyPaths(value: unknown, prefix = ""): string[] {
   if (value === null || typeof value !== "object") return [prefix];
@@ -19,10 +20,10 @@ describe("geography", () => {
 
   it("seeds islands with unique ids in known atolls", () => {
     const codes = new Set<string>(ATOLLS.map((a) => a.code));
-    expect(new Set(SEED_ISLANDS.map((i) => i.id)).size).toBe(
-      SEED_ISLANDS.length,
+    expect(new Set(SAMPLE_ISLANDS.map((i) => i.id)).size).toBe(
+      SAMPLE_ISLANDS.length,
     );
-    for (const island of SEED_ISLANDS)
+    for (const island of SAMPLE_ISLANDS)
       expect(codes.has(island.atollCode)).toBe(true);
   });
 });
@@ -71,13 +72,14 @@ describe("schemas", () => {
       quantityAvailable: 20,
       deliveryDestinations: [{ atollCode: "K" }],
       status: "active",
+      imagePaths: [],
     };
-    expect(listingInputSchema.safeParse(listing).success).toBe(true);
+    expect(productInputSchema.safeParse(listing).success).toBe(true);
     expect(
-      listingInputSchema.safeParse({ ...listing, priceLaari: 0 }).success,
+      productInputSchema.safeParse({ ...listing, priceLaari: 0 }).success,
     ).toBe(false);
     expect(
-      listingInputSchema.safeParse({ ...listing, status: "removed" }).success,
+      productInputSchema.safeParse({ ...listing, status: "removed" }).success,
     ).toBe(false);
   });
 });

@@ -13,10 +13,15 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "npm run lint && npm run typecheck && npm run test",
-    "emulators": "firebase emulators:start --project demo-farmconnect"
+    "emulators": "firebase emulators:start --project demo-farmconnect",
+    "test:emulator": "firebase emulators:exec --only auth,firestore,storage --project demo-farmconnect \"vitest run -c vitest.emulator.config.mts\"",
+    "test:storage-rules": "firebase emulators:exec --only firestore,storage --project demo-farmconnect \"vitest run -c vitest.emulator.config.mts tests/rules/storage.rules.test.ts\"",
+    "seed:reference": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env.local scripts/seed-reference-data.mts",
+    "admin:grant": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env.local scripts/grant-admin.mts",
+    "islands:import": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --env-file-if-exists=.env.local scripts/import-islands.mts"
   },
   "engines": {
-    "node": ">=22.13"
+    "node": ">=24.12.0"
   },
   "dependencies": {
     "firebase": "^13.0.0",
@@ -28,6 +33,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^24.19.2",
     "@types/react": "^19",

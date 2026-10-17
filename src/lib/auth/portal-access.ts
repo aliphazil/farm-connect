@@ -1,10 +1,11 @@
 import "server-only";
 
+import { adminCan, type AdminPermission } from "@shared/constants/admin";
 import type { Role } from "@shared/constants/roles";
 import { requireRole } from "./session";
 
 /**
- * Who may open each portal. Every page under app/[locale]/{farmer,buyer,admin}
+ * Who may open each portal. Every page under app/[locale]/{farmer,account,admin}
  * must call its portal's guard itself (enforced by portal-access.test.ts).
  *
  * Why in the page and not only the layout: with Cache Components / partial
@@ -15,10 +16,21 @@ import { requireRole } from "./session";
  */
 export const PORTAL_ROLES = {
   farmer: ["farmer"],
-  buyer: ["buyer", "farmer"],
+  // Farmers can also buy, so they may use the consumer portal too.
+  account: ["consumer", "farmer"],
   admin: ["admin"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export const requireFarmerPortal = () => requireRole(PORTAL_ROLES.farmer);
-export const requireBuyerPortal = () => requireRole(PORTAL_ROLES.buyer);
+export const requireConsumerPortal = () => requireRole(PORTAL_ROLES.account);
 export const requireAdminPortal = () => requireRole(PORTAL_ROLES.admin);
+
+/**
+ * Admin pages that need more than "admin.view". Returns the user and whether
+ * their level allows `permission`; the page shows a notice when it doesn't.
+ * (Every mutation is re-checked in its Server Action regardless.)
+ */
+export async function requireAdminPermission(permission: AdminPermission) {
+  const user = await requireAdminPortal();
+  return { user, allowed: adminCan(user.adminLevel, permission) };
+}

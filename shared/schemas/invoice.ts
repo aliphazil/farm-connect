@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { PRODUCT_UNITS } from "../constants/catalog";
 import {
   idSchema,
   laariSchema,
   mvPhoneSchema,
   timestampsSchema,
 } from "./common";
+import { orderItemSchema } from "./order";
 
 export const INVOICE_STATUSES = [
   "draft",
@@ -16,28 +16,26 @@ export const INVOICE_STATUSES = [
 ] as const;
 export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
 
-export const invoiceLineSchema = z.object({
-  description: z.string().trim().min(1).max(200),
-  quantity: z.number().positive().max(1_000_000),
-  unit: z.enum(PRODUCT_UNITS),
-  unitPriceLaari: laariSchema,
-  /** quantity × unitPrice, rounded to whole laari — computed server-side. */
-  totalLaari: laariSchema,
-});
+export const invoiceLineSchema = orderItemSchema
+  .omit({ productId: true })
+  .extend({
+    productId: idSchema.optional(),
+  });
 export type InvoiceLine = z.infer<typeof invoiceLineSchema>;
 
 /**
  * `invoices/{id}`. Numbers, totals and status are computed by server code,
- * never trusted from the client.
+ * never trusted from the client. Visible to the farmer, the consumer (if
+ * linked) and admins.
  */
 export const invoiceSchema = z
   .object({
     id: idSchema,
-    /** Sequential per farmer, e.g. "FC-0001". */
+    /** Sequential per farmer, e.g. "INV-0001". */
     number: z.string().min(1).max(32),
     farmerId: idSchema,
-    buyerId: idSchema.optional(),
-    enquiryId: idSchema.optional(),
+    consumerId: idSchema.optional(),
+    orderId: idSchema.optional(),
     buyerName: z.string().trim().min(1).max(120),
     buyerPhone: mvPhoneSchema.optional(),
     lines: z.array(invoiceLineSchema).min(1).max(100),
@@ -54,8 +52,8 @@ export const invoiceSchema = z
 export type Invoice = z.infer<typeof invoiceSchema>;
 
 export const invoiceInputSchema = z.object({
-  buyerId: idSchema.optional(),
-  enquiryId: idSchema.optional(),
+  consumerId: idSchema.optional(),
+  orderId: idSchema.optional(),
   buyerName: invoiceSchema.shape.buyerName,
   buyerPhone: mvPhoneSchema.optional(),
   lines: z

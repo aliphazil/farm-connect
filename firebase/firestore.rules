@@ -2,46 +2,140 @@ rules_version = '2';
 
 // FarmConnect Maldives — Firestore Security Rules
 //
-// Principles:
-// - Deny by default. Anything not matched below is denied.
-// - Roles come from Auth custom claims (`role`, `blocked`), set only by the Admin SDK.
-// - Privileged writes (accounts, roles, blocking, enquiries, invoices, payments,
-//   reports, branding, audit logs) go through trusted server code using the
-//   Admin SDK, which bypasses these rules. Clients cannot write those collections.
+// Principles
+// - Deny by default: anything not matched below is denied.
+// - Roles come ONLY from Auth custom claims (`role`, `blocked`), which only
+//   the Admin SDK can set. `users/{uid}.role` is never used for authorization.
+// - Writes by ordinary users also require `users/{uid}.status == "active"`,
+//   because a claim can lag up to an hour after an admin blocks an account.
+//   Suspended and blocked accounts therefore can't write. Features an admin
+//   switched off for one account are listed in `users/{uid}.restrictions`.
+// - Admin levels (owner/moderator) only matter for server-side mutations;
+//   every admin may read what these rules let admins read.
+// - Privileged and financial writes (registration, roles, blocking, approvals,
+//   moderation, orders, invoices, payments, receipts, branding, content,
+//   analytics, logs) are done by trusted server code with the Admin SDK,
+//   which bypasses these rules. Clients cannot write those collections.
 // - A document's id is not stored in its data (see shared/firestore-paths.ts).
+// - Keep enums in sync with shared/schemas and shared/constants.
+//
+// Tests: tests/rules/firestore.rules.test.ts  (npm run test:emulator)
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ---------- helpers ----------
+    // ---------- identity ----------
     function signedIn() {
       return request.auth != null;
     }
-    function hasRole(r) {
-      return signedIn() && request.auth.token.get('role', 'buyer') == r;
+    function uid() {
+      return request.auth.uid;
+    }
+    function claimRole() {
+      return request.auth.token.get('role', '');
+    }
+    function notBlockedClaim() {
+      return request.auth.token.get('blocked', false) != true;
     }
     function isAdmin() {
-      return hasRole('admin');
+      return signedIn() && claimRole() == 'admin' && notBlockedClaim();
     }
-    function isSelf(uid) {
-      return signedIn() && request.auth.uid == uid;
+    function isSelf(userId) {
+      return signedIn() && uid() == userId;
     }
-    // Claims can lag up to an hour after blocking, so writes also check the
-    // account document, which the server updates immediately.
-    function isActiveAccount() {
-      return signedIn()
-        && request.auth.token.get('blocked', false) != true
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active';
+    function accountActive() {
+      return exists(/databases/$(database)/documents/users/$(uid()))
+        && get(/databases/$(database)/documents/users/$(uid())).data.status == 'active';
+    }
+    // False when an admin has switched this feature off for the account.
+    function notRestricted(feature) {
+      return !(feature in get(/databases/$(database)/documents/users/$(uid())).data.get('restrictions', []));
+    }
+    // Any registered, non-blocked farmer or consumer.
+    function isActiveMember() {
+      return signedIn() && notBlockedClaim()
+        && (claimRole() == 'farmer' || claimRole() == 'consumer')
+        && accountActive();
     }
     function isActiveFarmer() {
-      return hasRole('farmer') && isActiveAccount();
-    }
-    function stampedNow(field) {
-      return request.resource.data[field] == request.time;
+      return signedIn() && notBlockedClaim() && claimRole() == 'farmer' && accountActive();
     }
 
-    // ---------- public reference data ----------
-    match /settings/{docId} {
+    // ---------- data helpers ----------
+    function data() {
+      return request.resource.data;
+    }
+    function stampedNow(field) {
+      return data()[field] == request.time;
+    }
+    function unchanged(field) {
+      return data().get(field, null) == resource.data.get(field, null);
+    }
+    function onlyChanges(keys) {
+      return data().diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+    function str(value, min, max) {
+      return value is string && value.size() >= min && value.size() <= max;
+    }
+    function optStr(map, key, max) {
+      return !(key in map) || str(map[key], 0, max);
+    }
+    // English and/or Dhivehi: at least one non-empty.
+    function localized(value, max) {
+      return value is map
+        && value.keys().hasAll(['en'])
+        && value.keys().hasOnly(['en', 'dv'])
+        && str(value.en, 0, max)
+        && optStr(value, 'dv', max)
+        && (value.en.size() > 0 || value.get('dv', '').size() > 0);
+    }
+    function atollCode(value) {
+      return value in ['MLE', 'HA', 'HDH', 'SH', 'N', 'R', 'B', 'LH', 'K', 'AA', 'ADH',
+                       'V', 'M', 'F', 'DH', 'TH', 'L', 'GA', 'GDH', 'GN', 'S'];
+    }
+    // An island from the `islands` collection, in the given atoll.
+    function knownIsland(atoll, islandId) {
+      return exists(/databases/$(database)/documents/islands/$(islandId))
+        && get(/databases/$(database)/documents/islands/$(islandId)).data.atollCode == atoll;
+    }
+    function location(value) {
+      return value is map
+        && value.keys().hasAll(['atollCode', 'islandId'])
+        && value.keys().hasOnly(['atollCode', 'islandId'])
+        && atollCode(value.atollCode)
+        && str(value.islandId, 1, 128)
+        && knownIsland(value.atollCode, value.islandId);
+    }
+    function phone(value) {
+      return value is string && value.matches('^[+]960[0-9]{7}$');
+    }
+    function optPhone(map, key) {
+      return !(key in map) || phone(map[key]);
+    }
+    function locale(value) {
+      return value in ['en', 'dv'];
+    }
+    function destinations(value) {
+      return value is list && value.size() <= 50;
+    }
+    function mapPin(value) {
+      return value is map
+        && value.keys().hasAll(['lat', 'lng'])
+        && value.keys().hasOnly(['lat', 'lng'])
+        && value.lat is number && value.lat >= -1 && value.lat <= 8
+        && value.lng is number && value.lng >= 72 && value.lng <= 74.5;
+    }
+
+    // ---------- public reference data (server-maintained) ----------
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /units/{unitId} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /atolls/{code} {
       allow read: if true;
       allow write: if false;
     }
@@ -49,102 +143,334 @@ service cloud.firestore {
       allow read: if true;
       allow write: if false;
     }
-
-    // ---------- private account records ----------
-    match /users/{uid} {
-      allow read: if isSelf(uid) || isAdmin();
+    match /siteSettings/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /siteContent/{contentId} {
+      allow read: if resource.data.published == true || isAdmin();
       allow write: if false;
     }
 
-    // ---------- public farm profiles ----------
-    match /farmers/{uid} {
-      allow read: if resource.data.visible == true || isSelf(uid) || isAdmin();
-      // Created by the server when a farmer account is approved/onboarded.
+    // ---------- accounts ----------
+    match /users/{userId} {
+      allow read: if isSelf(userId) || isAdmin();
+      // Created by the server at registration; never deleted by clients.
       allow create, delete: if false;
-      // Owners may edit descriptive fields only; `verified`/`visible` are admin-controlled.
-      allow update: if isSelf(uid)
-        && isActiveFarmer()
-        && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['farmName', 'bio', 'location', 'contact', 'deliveryDestinations', 'logoPath', 'updatedAt'])
-        && request.resource.data.farmName.en is string
-        && request.resource.data.farmName.en.size() > 0
-        && request.resource.data.farmName.en.size() <= 80
-        && request.resource.data.deliveryDestinations is list
-        && request.resource.data.deliveryDestinations.size() <= 50
+      // role, status, email and blockedReason are server-controlled.
+      allow update: if isSelf(userId)
+        && notBlockedClaim()
+        && accountActive()
+        && onlyChanges(['displayName', 'phone', 'preferredLocale', 'location', 'updatedAt'])
+        && str(data().displayName, 1, 80)
+        && optPhone(data(), 'phone')
+        && locale(data().preferredLocale)
+        && (!('location' in data()) || location(data().location))
         && stampedNow('updatedAt');
     }
 
-    // ---------- listings ----------
-    function validListing(d) {
-      return d.keys().hasAll(['farmerId', 'title', 'category', 'unit', 'priceLaari', 'quantityAvailable',
-                              'imagePaths', 'location', 'deliveryDestinations', 'status', 'createdAt', 'updatedAt'])
-        && d.keys().hasOnly(['farmerId', 'title', 'description', 'category', 'unit', 'priceLaari',
-                             'quantityAvailable', 'minOrderQuantity', 'imagePaths', 'location',
-                             'deliveryDestinations', 'status', 'availableFrom', 'createdAt', 'updatedAt'])
-        && d.title.en is string && d.title.en.size() > 0 && d.title.en.size() <= 100
-        && d.category in ['vegetables', 'leafy_greens', 'fruits', 'root_crops', 'herbs_spices',
-                          'coconut_products', 'eggs', 'poultry', 'fish', 'plants_seedlings', 'other']
-        && d.unit in ['kg', 'g', 'piece', 'bunch', 'dozen', 'bag', 'box', 'litre']
-        && d.priceLaari is int && d.priceLaari > 0
-        && d.quantityAvailable is number && d.quantityAvailable >= 0
-        && d.imagePaths is list && d.imagePaths.size() <= 6
-        && d.deliveryDestinations is list && d.deliveryDestinations.size() <= 50
-        // Farmers can't use 'removed' — that is an admin moderation state.
-        && d.status in ['draft', 'active', 'paused', 'sold_out'];
-    }
-    // Listing location must match the farm's location so marketplace filters are honest.
-    function matchesFarmLocation(d) {
-      return d.location == get(/databases/$(database)/documents/farmers/$(request.auth.uid)).data.location;
+    match /consumerProfiles/{userId} {
+      allow read: if isSelf(userId) || isAdmin();
+      allow create, delete: if false;
+      allow update: if isSelf(userId)
+        && isActiveMember()
+        && onlyChanges(['defaultDeliveryLocation', 'marketingOptIn', 'updatedAt'])
+        && data().marketingOptIn is bool
+        && (!('defaultDeliveryLocation' in data()) || location(data().defaultDeliveryLocation))
+        && stampedNow('updatedAt');
     }
 
-    match /listings/{listingId} {
-      allow read: if resource.data.status == 'active'
-        || isSelf(resource.data.farmerId)
+    function farmIsPublic(profile) {
+      return profile.approvalStatus == 'approved' && profile.visible == true;
+    }
+    function myFarm() {
+      return get(/databases/$(database)/documents/farmerProfiles/$(uid())).data;
+    }
+
+    match /farmerProfiles/{userId} {
+      // Public only once approved and not hidden (e.g. owner blocked).
+      allow read: if farmIsPublic(resource.data) || isSelf(userId) || isAdmin();
+      allow create, delete: if false;
+      // approvalStatus, verified and visible are admin-controlled.
+      allow update: if isSelf(userId)
+        && isActiveFarmer()
+        && onlyChanges(['farmName', 'bio', 'location', 'contact', 'deliveryDestinations', 'logoPath',
+                        'address', 'mapLocation', 'pickupAvailable', 'updatedAt'])
+        && localized(data().farmName, 80)
+        && (!('bio' in data()) || localized(data().bio, 1000))
+        && location(data().location)
+        && data().contact is map
+        && data().contact.keys().hasOnly(['phone', 'whatsapp', 'viber'])
+        && phone(data().contact.phone)
+        && optPhone(data().contact, 'whatsapp')
+        && optPhone(data().contact, 'viber')
+        && destinations(data().deliveryDestinations)
+        && (!('logoPath' in data()) || data().logoPath.matches('^farmers/' + userId + '/[^/]+$'))
+        && optStr(data(), 'address', 200)
+        && (!('mapLocation' in data()) || mapPin(data().mapLocation))
+        && data().pickupAvailable is bool
+        && stampedNow('updatedAt');
+    }
+
+    // ---------- products ----------
+    // siteSettings/moderation.listingsRequireApproval: new listings start "pending".
+    function approvalRequired() {
+      return exists(/databases/$(database)/documents/siteSettings/moderation)
+        && get(/databases/$(database)/documents/siteSettings/moderation).data.get('listingsRequireApproval', false) == true;
+    }
+    // A restricted farmer can't publish (status "active"); pausing, marking
+    // sold out and deleting still work.
+    function mayPublish(d) {
+      return d.status != 'active' || notRestricted('listings');
+    }
+    function productIsPublic(p) {
+      return p.status in ['active', 'sold_out'] && p.moderation == 'ok' && p.farmerVisible == true;
+    }
+    // Every image must live in this farmer's folder for this product.
+    function imageOk(paths, i, productId) {
+      return paths.size() <= i
+        || paths[i].matches('^products/' + uid() + '/' + productId + '/[A-Za-z0-9._-]{1,100}$');
+    }
+    function imagesOwned(paths, productId) {
+      return imageOk(paths, 0, productId) && imageOk(paths, 1, productId) && imageOk(paths, 2, productId)
+        && imageOk(paths, 3, productId) && imageOk(paths, 4, productId) && imageOk(paths, 5, productId);
+    }
+    function validProduct(d, productId) {
+      return d.keys().hasAll(['farmerId', 'title', 'category', 'unit', 'priceLaari', 'quantityAvailable',
+                              'imagePaths', 'location', 'deliveryDestinations', 'status', 'moderation',
+                              'farmerVisible', 'isPublic', 'searchTokens', 'deliveryAtolls', 'createdAt', 'updatedAt'])
+        && d.keys().hasOnly(['farmerId', 'title', 'description', 'category', 'unit', 'priceLaari',
+                             'quantityAvailable', 'minOrderQuantity', 'imagePaths', 'location',
+                             'deliveryDestinations', 'status', 'moderation', 'moderationNote', 'farmerVisible',
+                             'isPublic', 'searchTokens', 'deliveryAtolls',
+                             'availableFrom', 'harvestDate', 'pickupAvailable', 'createdAt', 'updatedAt'])
+        && localized(d.title, 100)
+        && (!('description' in d) || localized(d.description, 2000))
+        && d.category in ['vegetables', 'leafy_greens', 'fruits', 'root_crops', 'herbs_spices',
+                          'coconut_products', 'eggs', 'poultry', 'fish', 'plants_seedlings', 'other']
+        && d.unit in ['kg', 'g', 'piece', 'bunch', 'bundle', 'dozen', 'bag', 'box', 'litre']
+        && d.priceLaari is int && d.priceLaari > 0 && d.priceLaari <= 10000000000
+        && d.quantityAvailable is number && d.quantityAvailable >= 0 && d.quantityAvailable <= 1000000
+        && (!('minOrderQuantity' in d) || (d.minOrderQuantity is number && d.minOrderQuantity > 0))
+        && d.imagePaths is list && d.imagePaths.size() <= 6
+        && imagesOwned(d.imagePaths, productId)
+        && destinations(d.deliveryDestinations)
+        && d.status in ['draft', 'active', 'paused', 'sold_out']
+        && (!('availableFrom' in d) || d.availableFrom is timestamp)
+        && (!('harvestDate' in d) || d.harvestDate is timestamp)
+        && (!('pickupAvailable' in d) || d.pickupAvailable is bool)
+        // Derived search/visibility fields (shared/schemas/product.ts productDerivedFields).
+        && d.isPublic == productIsPublic(d)
+        && d.searchTokens is list && d.searchTokens.size() <= 80
+        && d.deliveryAtolls is list && d.deliveryAtolls.size() <= 21
+        && d.deliveryAtolls.hasAll([d.location.atollCode]);
+    }
+    // Farmer-supplied copies of farm data must match the farm profile, so
+    // a farmer can't make a product public before the farm is approved.
+    function matchesFarm(d) {
+      return d.location == myFarm().location && d.farmerVisible == farmIsPublic(myFarm());
+    }
+
+    match /products/{productId} {
+      allow read: if productIsPublic(resource.data)
+        || (signedIn() && resource.data.farmerId == uid())
         || isAdmin();
       allow create: if isActiveFarmer()
-        && request.resource.data.farmerId == request.auth.uid
-        && validListing(request.resource.data)
-        && matchesFarmLocation(request.resource.data)
+        && data().farmerId == uid()
+        && validProduct(data(), productId)
+        && data().moderation == (approvalRequired() ? 'pending' : 'ok')
+        && !('moderationNote' in data())
+        && mayPublish(data())
+        && matchesFarm(data())
         && stampedNow('createdAt')
         && stampedNow('updatedAt');
       allow update: if isActiveFarmer()
-        && isSelf(resource.data.farmerId)
-        && resource.data.status != 'removed'
-        && request.resource.data.farmerId == resource.data.farmerId
-        && request.resource.data.createdAt == resource.data.createdAt
-        && validListing(request.resource.data)
-        && matchesFarmLocation(request.resource.data)
+        && resource.data.farmerId == uid()
+        && resource.data.moderation in ['ok', 'pending', 'rejected']
+        && unchanged('farmerId')
+        // Editing a rejected listing resubmits it for review.
+        && (unchanged('moderation')
+          || (resource.data.moderation == 'rejected' && data().moderation == 'pending'))
+        && unchanged('moderationNote')
+        && unchanged('createdAt')
+        && mayPublish(data())
+        && validProduct(data(), productId)
+        && matchesFarm(data())
         && stampedNow('updatedAt');
-      // Listings are never hard-deleted by clients; set status instead.
+      // Removed (moderated) products are kept as evidence.
+      allow delete: if isActiveFarmer()
+        && resource.data.farmerId == uid()
+        && resource.data.moderation != 'removed';
+    }
+
+    // ---------- delivery areas ----------
+    function validDeliveryArea(d) {
+      return d.keys().hasAll(['farmerId', 'atollCode', 'method', 'active', 'createdAt', 'updatedAt'])
+        && d.keys().hasOnly(['farmerId', 'atollCode', 'islandId', 'method', 'feeLaari', 'minOrderLaari', 'notes',
+                             'active', 'createdAt', 'updatedAt'])
+        && atollCode(d.atollCode)
+        && d.method in ['ferry', 'speedboat', 'cargo_boat', 'own_vessel', 'courier', 'other']
+        && optStr(d, 'islandId', 128)
+        && (d.get('islandId', '') == '' || knownIsland(d.atollCode, d.islandId))
+        && (!('feeLaari' in d) || (d.feeLaari is int && d.feeLaari >= 0))
+        && (!('minOrderLaari' in d) || (d.minOrderLaari is int && d.minOrderLaari >= 0))
+        && optStr(d, 'notes', 300)
+        && d.active is bool;
+    }
+
+    match /deliveryAreas/{areaId} {
+      allow read: if resource.data.active == true
+        || (signedIn() && resource.data.farmerId == uid())
+        || isAdmin();
+      allow create: if isActiveFarmer()
+        && data().farmerId == uid()
+        && validDeliveryArea(data())
+        && stampedNow('createdAt')
+        && stampedNow('updatedAt');
+      allow update: if isActiveFarmer()
+        && resource.data.farmerId == uid()
+        && unchanged('farmerId')
+        && unchanged('createdAt')
+        && validDeliveryArea(data())
+        && stampedNow('updatedAt');
+      allow delete: if isActiveFarmer() && resource.data.farmerId == uid();
+    }
+
+    // ---------- enquiries ----------
+    function enquiryProduct(d) {
+      return get(/databases/$(database)/documents/products/$(d.productId)).data;
+    }
+
+    match /enquiries/{enquiryId} {
+      allow read: if signedIn()
+        && (resource.data.consumerId == uid() || resource.data.farmerId == uid() || isAdmin());
+      allow create: if isActiveMember()
+        && data().keys().hasAll(['productId', 'farmerId', 'consumerId', 'quantity', 'deliverTo', 'status',
+                                 'createdAt', 'updatedAt'])
+        && data().keys().hasOnly(['productId', 'farmerId', 'consumerId', 'quantity', 'message', 'consumerName',
+                                  'consumerPhone', 'deliverTo', 'status', 'createdAt', 'updatedAt'])
+        && data().consumerId == uid()
+        && data().farmerId != uid()
+        && notRestricted('enquiries')
+        && data().status == 'new'
+        && str(data().productId, 1, 128)
+        && exists(/databases/$(database)/documents/products/$(data().productId))
+        && enquiryProduct(data()).farmerId == data().farmerId
+        && productIsPublic(enquiryProduct(data()))
+        && data().quantity is number && data().quantity > 0 && data().quantity <= 1000000
+        && optStr(data(), 'message', 1000)
+        && optStr(data(), 'consumerName', 80)
+        && optPhone(data(), 'consumerPhone')
+        && location(data().deliverTo)
+        && stampedNow('createdAt')
+        && stampedNow('updatedAt');
+      // Farmers respond; consumers may cancel while still open.
+      allow update: if isActiveMember()
+        && onlyChanges(['status', 'updatedAt'])
+        && stampedNow('updatedAt')
+        && (
+          (resource.data.farmerId == uid()
+            && ((resource.data.status == 'new' && data().status in ['accepted', 'declined'])
+              || (resource.data.status == 'accepted' && data().status == 'completed')))
+          || (resource.data.consumerId == uid()
+            && resource.data.status in ['new', 'accepted']
+            && data().status == 'cancelled')
+        );
       allow delete: if false;
     }
 
-    // ---------- server-written records (read-only for clients) ----------
-    match /enquiries/{enquiryId} {
+    // ---------- favourites (products and farms) ----------
+    function favouriteTargetExists(d) {
+      return (d.targetType == 'product' && exists(/databases/$(database)/documents/products/$(d.targetId)))
+        || (d.targetType == 'farmer' && exists(/databases/$(database)/documents/farmerProfiles/$(d.targetId)));
+    }
+    match /favourites/{favouriteId} {
+      // A missing doc may be read only under the reader's own id prefix ("is
+      // this saved?"), so nobody can probe what other people have saved.
       allow read: if signedIn()
-        && (resource.data.buyerId == request.auth.uid
-            || resource.data.farmerId == request.auth.uid
-            || isAdmin());
+        && (resource == null ? favouriteId.split('_')[0] == uid() : resource.data.userId == uid());
+      allow create: if isActiveMember()
+        && data().keys().hasAll(['userId', 'targetType', 'targetId', 'createdAt'])
+        && data().keys().hasOnly(['userId', 'targetType', 'targetId', 'createdAt'])
+        && data().userId == uid()
+        && data().targetType in ['product', 'farmer']
+        && str(data().targetId, 1, 128)
+        && favouriteId == uid() + '_' + data().targetType + '_' + data().targetId
+        && favouriteTargetExists(data())
+        && stampedNow('createdAt');
+      allow delete: if signedIn() && resource.data.userId == uid();
+      allow update: if false;
+    }
+
+    // ---------- reports & moderation ----------
+    match /reports/{reportId} {
+      allow read: if signedIn() && (resource.data.reporterId == uid() || isAdmin());
+      allow create: if isActiveMember()
+        && data().keys().hasAll(['reporterId', 'targetType', 'targetId', 'reason', 'details', 'status',
+                                 'createdAt', 'updatedAt'])
+        && data().keys().hasOnly(['reporterId', 'targetType', 'targetId', 'reason', 'details', 'status',
+                                  'createdAt', 'updatedAt'])
+        && data().reporterId == uid()
+        && notRestricted('reports')
+        && data().status == 'open'
+        && data().targetType in ['product', 'user', 'farmer']
+        && str(data().targetId, 1, 128)
+        && data().reason in ['fraud_scam', 'fake_listing', 'wrong_price_or_quantity', 'non_delivery',
+                             'abusive_behaviour', 'prohibited_item', 'other']
+        && str(data().details, 10, 2000)
+        && stampedNow('createdAt')
+        && stampedNow('updatedAt');
+      // Status, resolution and handledBy are set by admins via server code.
+      allow update, delete: if false;
+    }
+    match /moderationActions/{actionId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // ---------- financial records (server-written, private) ----------
+    function isParty() {
+      return signedIn()
+        && (resource.data.farmerId == uid() || resource.data.get('consumerId', null) == uid());
+    }
+    match /orders/{orderId} {
+      allow read: if isParty() || isAdmin();
       allow write: if false;
     }
     match /invoices/{invoiceId} {
-      allow read: if signedIn()
-        && (resource.data.farmerId == request.auth.uid
-            || resource.data.get('buyerId', null) == request.auth.uid
-            || isAdmin());
+      allow read: if isParty() || isAdmin();
       allow write: if false;
     }
     match /payments/{paymentId} {
-      allow read: if signedIn()
-        && (resource.data.farmerId == request.auth.uid || isAdmin());
+      allow read: if isParty() || isAdmin();
       allow write: if false;
     }
-    match /reports/{reportId} {
-      allow read: if signedIn()
-        && (resource.data.reporterId == request.auth.uid || isAdmin());
+    match /receipts/{receiptId} {
+      allow read: if isParty() || isAdmin();
       allow write: if false;
     }
-    match /auditLogs/{logId} {
+
+    // ---------- analytics & audit ----------
+    // Anonymous usage events: create-only, strictly shaped, no reads except admins.
+    match /siteEvents/{eventId} {
+      allow read: if isAdmin();
+      allow create: if data().keys().hasAll(['type', 'locale', 'createdAt'])
+        && data().keys().hasOnly(['type', 'locale', 'path', 'productId', 'farmerId', 'channel', 'uid', 'createdAt'])
+        && (!('channel' in data()) || (data().type == 'contact_click' && data().channel in ['call', 'whatsapp', 'viber']))
+        && data().type in ['page_view', 'product_view', 'farmer_view', 'search', 'contact_click']
+        && locale(data().locale)
+        && optStr(data(), 'path', 200)
+        && optStr(data(), 'productId', 128)
+        && optStr(data(), 'farmerId', 128)
+        && (!('uid' in data()) || (signedIn() && data().uid == uid()))
+        && stampedNow('createdAt');
+      allow update, delete: if false;
+    }
+    match /analyticsDaily/{day} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /adminLogs/{logId} {
       allow read: if isAdmin();
       allow write: if false;
     }

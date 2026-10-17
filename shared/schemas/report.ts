@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { idSchema, timestampsSchema } from "./common";
 
-export const REPORT_TARGET_TYPES = ["listing", "user"] as const;
+export const REPORT_TARGET_TYPES = ["product", "user", "farmer"] as const;
 export const REPORT_REASONS = [
   "fraud_scam",
   "fake_listing",
@@ -19,7 +19,10 @@ export const REPORT_STATUSES = [
 ] as const;
 export type ReportStatus = (typeof REPORT_STATUSES)[number];
 
-/** Fraud / abuse report: `reports/{id}`. Visible to admins and the reporter. */
+/**
+ * Fraud / abuse report: `reports/{id}`. Created by any active signed-in user;
+ * visible only to the reporter and admins; updated only by server code.
+ */
 export const fraudReportSchema = z
   .object({
     id: idSchema,
@@ -42,3 +45,43 @@ export const fraudReportInputSchema = fraudReportSchema.pick({
   details: true,
 });
 export type FraudReportInput = z.infer<typeof fraudReportInputSchema>;
+
+export const MODERATION_ACTIONS = [
+  "user.block",
+  "user.unblock",
+  "user.suspend",
+  "user.restore",
+  "user.restrict",
+  "farmer.approve",
+  "farmer.reject",
+  "farmer.verify",
+  "product.approve",
+  "product.reject",
+  "product.remove",
+  "product.restore",
+  "product.deactivate",
+  "report.review",
+  "report.resolve",
+  "report.dismiss",
+] as const;
+export type ModerationActionType = (typeof MODERATION_ACTIONS)[number];
+
+/**
+ * `moderationActions/{id}` — what an admin did to a user or piece of content,
+ * and why. Append-only, server-written, admin-readable.
+ */
+export const moderationActionSchema = z.object({
+  id: idSchema,
+  actorId: idSchema,
+  action: z.enum(MODERATION_ACTIONS),
+  targetType: z.enum(["user", "farmer", "product", "report"]),
+  targetId: idSchema,
+  reason: z.string().max(1000).optional(),
+  reportId: idSchema.optional(),
+  /** End of a suspension, when the action is one. */
+  until: z.date().optional(),
+  /** Restrictions in force after a user.restrict action. */
+  restrictions: z.array(z.string().max(40)).max(10).optional(),
+  createdAt: z.date(),
+});
+export type ModerationAction = z.infer<typeof moderationActionSchema>;
