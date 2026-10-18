@@ -10,6 +10,28 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: dict.pages.creditsTitle };
 }
 
+/** Typefaces the site serves (details: src/fonts/LICENSE.md). */
+const FONT_CREDITS = [
+  {
+    name: "MV Faseyha",
+    credit:
+      "Calligraphy by Abdulla Waheed, Office of the President; managed by Hassan Shujau; edited by Hassan Hameed (1995). Used with permission.",
+  },
+  {
+    name: "MV Waheed",
+    credit:
+      "Named after calligrapher Abdulla Waheed; created by Hassan Shujau and Hassan Hameed (1996). Used with permission.",
+  },
+  {
+    name: "Inter",
+    credit: "The Inter Project Authors. SIL Open Font License 1.1.",
+  },
+  {
+    name: "Noto Sans Thaana",
+    credit: "Google LLC. SIL Open Font License 1.1.",
+  },
+];
+
 /** Attribution for bundled sample photos, as their CC licences require. */
 export default async function CreditsPage() {
   const [locale, dict, credits] = await Promise.all([
@@ -65,6 +87,24 @@ export default async function CreditsPage() {
           </li>
         ))}
       </ul>
+
+      <section aria-labelledby="fonts" className="mt-10 max-w-3xl">
+        <h2 id="fonts" className="mb-2 text-xl font-semibold">
+          {dict.pages.fontsTitle}
+        </h2>
+        <p className="mb-4 text-sm text-muted">{dict.pages.fontsIntro}</p>
+        <ul
+          className="divide-y divide-border rounded-xl border border-border bg-surface text-sm"
+          dir="ltr"
+        >
+          {FONT_CREDITS.map((f) => (
+            <li key={f.name} className="flex flex-col gap-1 p-4">
+              <span className="font-medium">{f.name}</span>
+              <span className="text-muted">{f.credit}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
     </Container>
   );
 }

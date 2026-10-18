@@ -353,7 +353,9 @@
     "draftNotice": "Draft for review. This text has not yet been approved and may change before launch.",
     "lastUpdated": "Last updated {date}",
     "creditsTitle": "Photo credits",
-    "creditsIntro": "Sample product photos come from Wikimedia Commons and are used under the licences below."
+    "creditsIntro": "Sample product photos come from Wikimedia Commons and are used under the licences below.",
+    "fontsTitle": "Fonts",
+    "fontsIntro": "Dhivehi text uses MV Faseyha (body) and MV Waheed (headings), published with permission. Latin text uses Inter and the fallback Thaana font is Noto Sans Thaana, both under the SIL Open Font License 1.1."
   },
   "location": {
     "atoll": "Atoll",

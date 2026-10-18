@@ -11,7 +11,8 @@
 
   /* Branding Studio style choices (see src/lib/branding/theme.ts). */
   --font-body:
-    var(--nf-inter), var(--nf-thaana), ui-sans-serif, system-ui, sans-serif;
+    var(--nf-inter), var(--nf-faseyha), var(--nf-thaana), ui-sans-serif,
+    system-ui, sans-serif;
   --font-heading: var(--font-body);
   --heading-weight: 700;
   --btn-radius: 0.5rem;
@@ -49,8 +50,11 @@
 
   /* --nf-* variables are provided by next/font in the root layout. */
   --font-sans: var(--font-body);
+  /* MV Faseyha for Thaana text, Noto Sans Thaana as fallback. */
   --font-thaana:
-    var(--nf-thaana), var(--nf-inter), ui-sans-serif, system-ui, sans-serif;
+    var(--nf-faseyha), var(--nf-thaana), var(--nf-inter), ui-sans-serif,
+    system-ui, sans-serif;
+  --font-thaana-heading: var(--nf-waheed), var(--font-thaana);
 }
 
 body {
@@ -70,6 +74,12 @@ html:lang(dv) body {
   font-family: var(--font-thaana);
   font-size: 1.0625rem;
   line-height: 1.9;
+}
+
+/* Dhivehi headings use MV Waheed (a single weight: never fake a bold). */
+html:lang(dv) :is(h1, h2, h3) {
+  font-family: var(--font-thaana-heading);
+  font-synthesis-weight: none;
 }
 
 /* Dhivehi snippets inside English pages (e.g. the language switcher). */

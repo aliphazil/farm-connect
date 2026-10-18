@@ -1,6 +1,7 @@
 import { Suspense, type CSSProperties } from "react";
 import type { Metadata, Viewport } from "next";
 import { Inter, Noto_Sans_Thaana } from "next/font/google";
+import localFont from "next/font/local";
 import { LOCALE_DIRECTION, LOCALES } from "@shared/constants/locales";
 import { getDictionary, getLocale, getSiteConfig } from "@/i18n/server";
 import { storageObjectUrl } from "@/features/catalog/images";
@@ -22,6 +23,38 @@ const thaana = Noto_Sans_Thaana({
   display: "swap",
 });
 
+// Dhivehi typefaces, used with permission (see src/fonts/LICENSE.md). They
+// cover Thaana only, so Latin text and digits keep Inter. (next/font needs
+// literal option values, so the range is written out twice.)
+const faseyha = localFont({
+  src: "../../fonts/MV_Faseyha.otf",
+  variable: "--nf-faseyha",
+  display: "swap",
+  preload: false,
+  // No generated Arial fallback: it would catch Latin text before Inter.
+  adjustFontFallback: false,
+  declarations: [
+    {
+      prop: "unicode-range",
+      value: "U+0780-07BF, U+060C, U+061B, U+061F, U+066B-066C, U+FDF2",
+    },
+  ],
+});
+const waheed = localFont({
+  src: "../../fonts/MV_Waheed.otf",
+  variable: "--nf-waheed",
+  display: "swap",
+  preload: false,
+  // No generated Arial fallback: it would catch Latin text before Inter.
+  adjustFontFallback: false,
+  declarations: [
+    {
+      prop: "unicode-range",
+      value: "U+0780-07BF, U+060C, U+061B, U+061F, U+066B-066C, U+FDF2",
+    },
+  ],
+});
+
 export async function generateStaticParams() {
   return LOCALES.map((locale) => ({ locale }));
 }
@@ -41,6 +74,8 @@ export async function generateMetadata(): Promise<Metadata> {
     ? storageObjectUrl(config.seo.shareImagePath)
     : undefined;
   return {
+    // Sample-data previews stay out of search results (see app/robots.ts).
+    ...(isSampleCatalog ? { robots: { index: false, follow: false } } : {}),
     title: {
       default: seoTitle || dict.meta.siteName,
       template: `%s · ${dict.meta.siteName}`,
@@ -82,7 +117,7 @@ export default async function RootLayout({
     <html
       lang={locale}
       dir={LOCALE_DIRECTION[locale]}
-      className={`${inter.variable} ${thaana.variable} h-full antialiased`}
+      className={`${inter.variable} ${thaana.variable} ${faseyha.variable} ${waheed.variable} h-full antialiased`}
       style={themeVariables(config.theme) as CSSProperties}
     >
       <body className="flex min-h-full flex-col font-sans">

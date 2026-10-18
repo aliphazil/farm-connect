@@ -165,6 +165,54 @@ buyer; search and filter; open a product; as a test farmer create a listing
 with a photo; as owner open `/en/admin`, `/en/admin/analytics` and
 `/en/admin/payments`; download an invoice PDF; sign out.
 
+## 6b. Current production: Hostinger VPS (mydhandu.com)
+
+Set up 2026-10-18. Sample-data preview: `CATALOG_SOURCE=sample`, sign-in off,
+search engines asked not to index (`/robots.txt`, `noindex`).
+
+| Item       | Value                                                                    |
+| ---------- | ------------------------------------------------------------------------ |
+| Server     | Hostinger VPS KVM 1, Mumbai, Ubuntu 24.04, IP `200.234.34.201`           |
+| DNS        | Cloudflare: `A mydhandu.com` and `A www` → server IP, DNS only (grey)    |
+| HTTPS      | Caddy (`/etc/caddy/Caddyfile`), Let's Encrypt, auto-renewing; www → apex |
+| App        | `/srv/farmconnect/app`, user `farmconnect`, `systemd` unit `farmconnect` |
+| Listens on | `127.0.0.1:3000` (only Caddy is public: ports 80/443; SSH 22)            |
+| Security   | ufw, fail2ban, unattended security upgrades, SSH keys only               |
+
+SSH: `ssh -i ~/.ssh/farmconnect_vps root@200.234.34.201` (key on the
+owner's Mac). Hostinger's browser console works if the key is lost.
+
+The Dhivehi font files (`src/fonts/*.otf`) are not in git; the update below
+copies them from the owner's Mac. Building from a fresh clone needs them
+copied in first (see `src/fonts/LICENSE.md`).
+
+**Update the site** (from the project folder, after the checks in section 1):
+
+```bash
+rsync -az --delete -e "ssh -i ~/.ssh/farmconnect_vps" \
+  --exclude node_modules --exclude .next --exclude .git --exclude .claude \
+  --exclude '.env*' --exclude '*.log' ./ root@200.234.34.201:/srv/farmconnect/app/
+ssh -i ~/.ssh/farmconnect_vps root@200.234.34.201 'cd /srv/farmconnect/app &&
+  chown -R farmconnect:farmconnect . &&
+  sudo -u farmconnect -H npm ci --no-audit --no-fund &&
+  sudo -u farmconnect -H env CATALOG_SOURCE=sample NODE_OPTIONS=--max-old-space-size=3072 npx next build &&
+  systemctl restart farmconnect'
+```
+
+**Logs**: `journalctl -u farmconnect -f` (app), `journalctl -u caddy` and
+`/var/log/caddy/mydhandu.log` (web). **Rollback**: re-sync the previous
+commit (`git checkout <commit>` locally, then the update commands).
+
+**Going live with Firebase**: set the `NEXT_PUBLIC_FIREBASE_*` values and
+`CATALOG_SOURCE=firestore` in the unit (`Environment=` lines) _and_ for the
+build, add the three `FIREBASE_ADMIN_*` secrets in a root-only
+`EnvironmentFile=` (mode 600), add `mydhandu.com` to Firebase Authorized
+domains, rebuild and restart. Consider Cloudflare proxy (orange cloud) with
+SSL mode **Full (strict)** once HTTPS works.
+
+**Backups**: enable Hostinger VPS backups/snapshots in hPanel (take a
+snapshot before big changes). The data itself lives in Firebase (section 7).
+
 ## 7. Backup and recovery
 
 **Firestore**

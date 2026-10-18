@@ -7,10 +7,11 @@ import type { SiteConfig } from "@shared/schemas";
  */
 const FONTS = {
   inter:
-    "var(--nf-inter), var(--nf-thaana), ui-sans-serif, system-ui, sans-serif",
+    "var(--nf-inter), var(--nf-faseyha), var(--nf-thaana), ui-sans-serif, system-ui, sans-serif",
   system:
-    "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, var(--nf-thaana), sans-serif",
-  serif: "ui-serif, Georgia, 'Times New Roman', var(--nf-thaana), serif",
+    "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, var(--nf-faseyha), var(--nf-thaana), sans-serif",
+  serif:
+    "ui-serif, Georgia, 'Times New Roman', var(--nf-faseyha), var(--nf-thaana), serif",
 } as const;
 
 const BUTTON_RADIUS = {
