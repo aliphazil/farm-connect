@@ -218,7 +218,9 @@ describe("admin operations", () => {
 
     await blockUser(admin, uid, "Fraud reports confirmed");
     const authUser = await getAdminAuth().getUser(uid);
-    expect(authUser.disabled).toBe(true);
+    // Firebase sign-in stays possible (for the appeal page); the claim,
+    // revoked tokens, users.status and rules stop everything else.
+    expect(authUser.disabled).toBe(false);
     expect(authUser.customClaims).toMatchObject({
       role: "farmer",
       blocked: true,

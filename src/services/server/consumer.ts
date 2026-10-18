@@ -8,6 +8,8 @@ import {
   farmerProfileSchema,
   favouriteSchema,
   fraudReportSchema,
+  reportMessageSchema,
+  type ReportMessage,
   invoiceSchema,
   paymentRecordSchema,
   productSchema,
@@ -198,6 +200,8 @@ export async function listConsumerFinance(uid: string): Promise<{
 // ---------- reports ----------
 export type ConsumerReport = FraudReport & {
   targetLabel: LocalizedText | null;
+  evidenceCount: number;
+  messages: Pick<ReportMessage, "id" | "author" | "body" | "createdAt">[];
 };
 
 export async function listConsumerReports(
@@ -207,17 +211,38 @@ export async function listConsumerReports(
     snapToModel(fraudReportSchema, d),
   );
   return Promise.all(
-    reports.map(async (r) => ({
-      ...r,
-      // `handledBy` is an admin's id — don't pass it to the buyer.
-      handledBy: undefined,
-      targetLabel:
-        r.targetType === "product"
-          ? ((await getListing(r.targetId))?.title ?? null)
-          : r.targetType === "farmer"
-            ? ((await getFarmer(r.targetId))?.farmName ?? null)
-            : null,
-    })),
+    reports.map(async (r) => {
+      const messages = await col(COLLECTIONS.reports)
+        .doc(r.id)
+        .collection("messages")
+        .orderBy("createdAt", "asc")
+        .limit(50)
+        .get();
+      return {
+        ...r,
+        // Admin ids and decision internals aren't for the reporter.
+        handledBy: undefined,
+        assigneeId: undefined,
+        enforcementActionId: undefined,
+        evidenceCount: r.evidencePaths?.length ?? 0,
+        evidencePaths: undefined,
+        messages: messages.docs
+          .map((d) => snapToModel(reportMessageSchema, d))
+          .filter((m): m is ReportMessage => m !== null)
+          .map(({ author, body, createdAt, id }) => ({
+            id,
+            author,
+            body,
+            createdAt,
+          })),
+        targetLabel:
+          r.targetType === "product"
+            ? ((await getListing(r.targetId))?.title ?? null)
+            : r.targetType === "farmer"
+              ? ((await getFarmer(r.targetId))?.farmName ?? null)
+              : null,
+      };
+    }),
   );
 }
 

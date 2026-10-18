@@ -67,6 +67,22 @@ service firebase.storage {
       allow update, delete: if false;
     }
 
+    // Report evidence: private to the reporter and admins, write-once, so
+    // it stays trustworthy. Any active farmer or buyer may upload; the
+    // server checks each file again when the report is submitted.
+    function isActiveMember(ownerId) {
+      return signedIn()
+        && request.auth.uid == ownerId
+        && request.auth.token.get('role', '') in ['farmer', 'consumer']
+        && notBlocked()
+        && firestore.get(/databases/(default)/documents/users/$(ownerId)).data.status == 'active';
+    }
+    match /reportEvidence/{reporterId}/{fileName} {
+      allow read: if (signedIn() && request.auth.uid == reporterId) || isAdmin();
+      allow create: if resource == null && isActiveMember(reporterId) && safeName(fileName) && isProof();
+      allow update, delete: if false;
+    }
+
     // Site branding assets are uploaded by server code (Admin SDK) only.
     match /branding/{fileName} {
       allow read: if true;

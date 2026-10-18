@@ -97,3 +97,24 @@ export async function deleteStoredFile(path: string): Promise<void> {
       throw error;
   }
 }
+
+/** Report evidence: photos or PDFs (Storage rules enforce the same limits). */
+export function checkEvidence(file: {
+  type: string;
+  size: number;
+}): ImageProblem | null {
+  if (!(UPLOAD_LIMITS.evidenceTypes as readonly string[]).includes(file.type))
+    return "type";
+  if (file.size > UPLOAD_LIMITS.evidenceBytes) return "size";
+  return null;
+}
+
+export async function uploadReportEvidence(file: Blob): Promise<string> {
+  const type = file.type;
+  const ext =
+    type === "application/pdf" ? "pdf" : objectName(type).split(".").pop();
+  const name = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
+  const path = storagePaths.reportEvidence(await requireUid(), name);
+  await uploadBytes(ref(getClientStorage(), path), file, { contentType: type });
+  return path;
+}

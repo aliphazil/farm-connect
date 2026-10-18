@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import type { Locale } from "@shared/constants/locales";
 import type { Dictionary } from "@shared/i18n";
@@ -23,6 +23,7 @@ export function LoginForm({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const redirect = useAuthRedirect(locale);
+  const router = useRouter();
   const next = useSearchParams().get("next");
   const t = dict.auth;
 
@@ -38,8 +39,14 @@ export function LoginForm({
         next,
       );
     } catch (err) {
+      const key = authErrorKey(err);
+      // Locked accounts go to the page that explains why and takes appeals.
+      if (key === "accountBlocked" || key === "accountSuspended") {
+        router.replace(localeHref(locale, "/appeal"));
+        return;
+      }
       console.error(err);
-      setError(dict.authErrors[authErrorKey(err)]);
+      setError(dict.authErrors[key]);
       setPending(false);
     }
   }

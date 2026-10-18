@@ -6,6 +6,7 @@ import { getFarmerProfile, getUserAccount } from "@/services/server/accounts";
 import { getFarmerDashboard } from "@/services/server/farmer";
 import { FarmStatus } from "@/features/farmer/components/farm-status";
 import { Alert } from "@/components/ui/alert";
+import { NoticeBanner } from "@/components/layout/notice-banner";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, PageHeader } from "@/components/ui/layout-primitives";
 
@@ -61,6 +62,7 @@ export default async function FarmerDashboardPage() {
       {!user.emailVerified ? (
         <Alert tone="info">{dict.auth.verifyEmail}</Alert>
       ) : null}
+      <NoticeBanner uid={user.uid} dict={dict} locale={locale} />
       {account?.restrictions?.includes("listings") ? (
         <Alert tone="warning">{dict.restrictionNotices.listings}</Alert>
       ) : null}

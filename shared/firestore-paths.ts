@@ -27,6 +27,11 @@ export const COLLECTIONS = {
   favourites: "favourites",
   reports: "reports",
   moderationActions: "moderationActions",
+  enforcementActions: "enforcementActions",
+  /** Server-only: one doc per reporter + subject while a report is open (duplicate guard). */
+  reportGuards: "reportGuards",
+  /** Server-only: per-user report submission counters (rate limit). */
+  reportQuotas: "reportQuotas",
   orders: "orders",
   invoices: "invoices",
   payments: "payments",
@@ -65,6 +70,8 @@ export const storagePaths = {
   paymentProof: (farmerId: string, paymentId: string, fileName: string) =>
     `payments/${farmerId}/${paymentId}/${fileName}`,
   brandingAsset: (fileName: string) => `branding/${fileName}`,
+  reportEvidence: (reporterId: string, fileName: string) =>
+    `reportEvidence/${reporterId}/${fileName}`,
 };
 
 export const UPLOAD_LIMITS = {
@@ -72,4 +79,6 @@ export const UPLOAD_LIMITS = {
   imageTypes: ["image/jpeg", "image/png", "image/webp"],
   proofBytes: 5 * 1024 * 1024,
   proofTypes: ["image/jpeg", "image/png", "image/webp", "application/pdf"],
+  evidenceBytes: 5 * 1024 * 1024,
+  evidenceTypes: ["image/jpeg", "image/png", "image/webp", "application/pdf"],
 } as const;

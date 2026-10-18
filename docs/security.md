@@ -38,10 +38,52 @@
   - Admins can lift ended suspensions in bulk from the dashboard.
 - **Restrictions**: `users.restrictions` (enquiries, listings, reports) are
   server-written and enforced by Security Rules (`notRestricted()`).
-- **Blocking**: sets the `blocked` claim, disables the Auth user, revokes
-  refresh tokens, marks `users/{uid}.status = "blocked"`, hides the farm and
-  its products, and logs the action. Rules also check `users.status` on writes,
-  because a token's claims can lag up to an hour.
+- **Blocking**: sets the `blocked` claim, revokes refresh tokens, marks
+  `users/{uid}.status = "blocked"`, hides the farm and its products, and logs
+  the action. Rules also check `users.status` on writes, because a token's
+  claims can lag up to an hour.
+  - Since the trust & safety phase, blocking **doesn't disable Firebase
+    sign-in**, so a blocked person can sign in to the `/appeal` page, read the
+    reason and appeal. They still get no session (`/api/auth/session` returns
+    `account_blocked`), and every write is refused by rules (blocked claim and
+    status) and by server code.
+  - Invoices, payments, enquiries, reports, products and audit records are
+    kept; nothing is deleted.
+
+## Trust & safety
+
+- **Reports** are created only by server code (`src/services/server/reports.ts`);
+  clients can't write them.
+  - _Who may report what_: buyers report farms and listings; farmers report
+    buyers through an enquiry they received; anyone may report an account
+    they've dealt with (shared enquiry). Nobody can report themselves or an
+    administrator. The server resolves the reported account.
+  - _Duplicates_: one open report per reporter and subject (a guard document
+    created in the same transaction, released when the report closes).
+  - _Rate limit_: 5 reports per reporter per 24 hours.
+  - _Abuse_: suspended, blocked and report-restricted accounts can't report.
+  - _Evidence_: up to 3 images/PDFs of 5 MB in `reportEvidence/{uid}/`,
+    write-once, readable only by the reporter and admins. The server checks
+    each path is the reporter's own and that the type and size are allowed.
+    Admins open files through `/api/admin/report-evidence`, which sends
+    `nosniff` and a sandboxing CSP.
+- **Privacy**: the reported party can never read a report. Internal admin
+  notes are in an admin-only subcollection. Messages to the reporter are in
+  a subcollection only the reporter and admins can read. Reasons shown to
+  the reported user are written separately and the form says not to mention
+  the reporter.
+- **Enforcement records** (`enforcementActions`): warning, restriction,
+  suspension and block, each with the user-facing reason, an admin-only
+  note, the administrator, dates, expiry and the appeal. They're readable
+  only by admins; users see their own through server code that leaves out
+  internal fields.
+- **Appeals**: users appeal from `/account/notices`, or from `/appeal` when
+  locked out.
+  - `/api/appeals` authenticates with a fresh-verified ID token and only
+    touches the caller's own records. There's one appeal per action.
+  - Owners can close appeals, and can allow admins to pause the appeal on a
+    specific action during an investigation, with a reason the user sees.
+  - Deciding an appeal against a block needs an owner.
 
 ## Authorization layers
 
@@ -73,26 +115,31 @@ cookie), so it isn't CSRF-able.
 
 ## Known limitations / open items
 
-| #   | Issue                                                                                                     | Risk                                                       | Mitigation / next step                                                                           |
-| --- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| 1   | `siteEvents` accepts anonymous creates                                                                    | Spam writes can raise Firestore costs                      | Enable **Firebase App Check** (reCAPTCHA Enterprise) and enforce it for Firestore; budget alerts |
-| 2   | No App Check on Auth / Firestore / Storage generally                                                      | Scripts can call the APIs directly (still bound by rules)  | Enable App Check before launch                                                                   |
-| 3   | Product and farm-logo images are publicly readable by path, even for draft products                       | Low: images only                                           | Accept, or move drafts under a private path                                                      |
-| 4   | Farmer contact numbers in public farm profiles                                                            | By design (direct contact)                                 | Shown in the privacy policy; farmers choose what to add                                          |
-| 5   | Role claim changes take effect on next sign-in (sessions are revoked on role change/block)                | Brief lag only for unblock/approve                         | Acceptable                                                                                       |
-| 6   | Email verification isn't required to use the site                                                         | Fake emails can register                                   | Required for admin grant; consider requiring it for farmers before approval                      |
-| 7   | Sign-in rate limiting relies on Firebase Auth's built-in protection                                       | Brute-force on weak passwords                              | Enable reCAPTCHA/App Check for Auth; consider password policy in console                         |
-| 8   | Storage rules tests not run in CI yet                                                                     | Rules regressions                                          | Run `npm run test:storage-rules` locally; add CI                                                 |
-| 9   | Island list is a seed of capitals + farming islands                                                       | Farmers on other islands can't register a precise location | Expand `islands` collection (admin tool in a later phase)                                        |
-| 10  | Dashboard view/click counts come from anonymous `siteEvents`, which anyone can create with any `farmerId` | A farmer's counts can be inflated (no data exposure)       | App Check; later aggregate from trusted signals                                                  |
-| 11  | Photos uploaded during a product save that then fails stay in Storage                                     | Storage cost only                                          | Periodic cleanup of objects not referenced by `products.imagePaths`                              |
-| 12  | Photos of draft products are readable by URL (paths are unguessable but public)                           | Low                                                        | Accept, or move drafts to a private path                                                         |
-| 13  | A farmer can stuff extra words into a product title to appear in more searches                            | Search spam (titles are public and reportable)             | Report action on every listing; admin removal; ranking in a future search service                |
-| 14  | View/click de-duplication is per browser session (sessionStorage), not per person                         | Counts are indicative, not exact                           | Labelled as such on the dashboard; App Check to limit scripted inflation                         |
-| 15  | A contact click only means the buyer opened their phone/chat app                                          | Could be mistaken for a delivered message or sale          | Dashboard hint says so; no "sent"/"sold" status is derived from clicks                           |
-| 16  | Moderators can see private profile details (address, map pin, buyer preferences) needed for review        | Insider misuse                                             | Grant moderator access sparingly; every action is logged; consider masking in a later phase      |
-| 17  | With pre-approval on, edits to an already-approved listing don't go back to review                        | Bait-and-switch after approval                             | Reports + audit history; optionally re-review on title/photo changes                             |
-| 18  | Disabling a category/unit hides it from new listings only (not enforced in rules)                         | A crafted client could still use it                        | Ids remain valid values; enforce in rules if needed                                              |
+| #   | Issue                                                                                                           | Risk                                                       | Mitigation / next step                                                                              |
+| --- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 1   | `siteEvents` accepts anonymous creates                                                                          | Spam writes can raise Firestore costs                      | Enable **Firebase App Check** (reCAPTCHA Enterprise) and enforce it for Firestore; budget alerts    |
+| 2   | No App Check on Auth / Firestore / Storage generally                                                            | Scripts can call the APIs directly (still bound by rules)  | Enable App Check before launch                                                                      |
+| 3   | Product and farm-logo images are publicly readable by path, even for draft products                             | Low: images only                                           | Accept, or move drafts under a private path                                                         |
+| 4   | Farmer contact numbers in public farm profiles                                                                  | By design (direct contact)                                 | Shown in the privacy policy; farmers choose what to add                                             |
+| 5   | Role claim changes take effect on next sign-in (sessions are revoked on role change/block)                      | Brief lag only for unblock/approve                         | Acceptable                                                                                          |
+| 6   | Email verification isn't required to use the site                                                               | Fake emails can register                                   | Required for admin grant; consider requiring it for farmers before approval                         |
+| 7   | Sign-in rate limiting relies on Firebase Auth's built-in protection                                             | Brute-force on weak passwords                              | Enable reCAPTCHA/App Check for Auth; consider password policy in console                            |
+| 8   | Storage rules tests not run in CI yet                                                                           | Rules regressions                                          | Run `npm run test:storage-rules` locally; add CI                                                    |
+| 9   | Island list is a seed of capitals + farming islands                                                             | Farmers on other islands can't register a precise location | Expand `islands` collection (admin tool in a later phase)                                           |
+| 10  | Dashboard view/click counts come from anonymous `siteEvents`, which anyone can create with any `farmerId`       | A farmer's counts can be inflated (no data exposure)       | App Check; later aggregate from trusted signals                                                     |
+| 11  | Photos uploaded during a product save that then fails stay in Storage                                           | Storage cost only                                          | Periodic cleanup of objects not referenced by `products.imagePaths`                                 |
+| 12  | Photos of draft products are readable by URL (paths are unguessable but public)                                 | Low                                                        | Accept, or move drafts to a private path                                                            |
+| 13  | A farmer can stuff extra words into a product title to appear in more searches                                  | Search spam (titles are public and reportable)             | Report action on every listing; admin removal; ranking in a future search service                   |
+| 14  | View/click de-duplication is per browser session (sessionStorage), not per person                               | Counts are indicative, not exact                           | Labelled as such on the dashboard; App Check to limit scripted inflation                            |
+| 15  | A contact click only means the buyer opened their phone/chat app                                                | Could be mistaken for a delivered message or sale          | Dashboard hint says so; no "sent"/"sold" status is derived from clicks                              |
+| 16  | Moderators can see private profile details (address, map pin, buyer preferences) needed for review              | Insider misuse                                             | Grant moderator access sparingly; every action is logged; consider masking in a later phase         |
+| 17  | With pre-approval on, edits to an already-approved listing don't go back to review                              | Bait-and-switch after approval                             | Reports + audit history; optionally re-review on title/photo changes                                |
+| 18  | Disabling a category/unit hides it from new listings only (not enforced in rules)                               | A crafted client could still use it                        | Ids remain valid values; enforce in rules if needed                                                 |
+| 19  | Report rate limit is per account; someone with many accounts can still flood reports                            | Review workload                                            | Admin triage (assignment, dismissal); App Check; per-target limits later                            |
+| 20  | Evidence files that fail server checks, or are never attached, stay in Storage                                  | Storage cost only                                          | Periodic cleanup of unattached `reportEvidence/` objects                                            |
+| 21  | Evidence isn't scanned for malware                                                                              | An admin could open a harmful PDF                          | Served sandboxed with nosniff; add a scanning step (e.g. Cloud Functions + a scanner) before launch |
+| 22  | A blocked person can still sign in to Firebase (for appeals) and read their own private records and public data | Low (no writes)                                            | Intended trade-off; disable sign-in manually in the console for extreme cases                       |
+| 23  | Reasons shown to reported users are free text; an admin could still mention the reporter                        | Reporter exposure                                          | UI warning on the field; admin training; review in audit log                                        |
 
 ### Buyer portal (consumer phase)
 

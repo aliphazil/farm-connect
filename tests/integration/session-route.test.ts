@@ -85,9 +85,12 @@ describe("POST /api/auth/session", () => {
     ).toBe("active");
   });
 
-  it("refuses a blocked account (sign-in itself is disabled)", async () => {
+  it("refuses a blocked account a session (Firebase sign-in still works, for appeals)", async () => {
     const { uid, email } = await member();
     await blockUser(owner, uid, "Fraud");
-    await expect(signInRequest(email)).rejects.toThrow(/user-disabled/);
+    const res = await signInRequest(email);
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: "account_blocked" });
+    expect(res.headers.get("set-cookie")).toBeNull();
   });
 });

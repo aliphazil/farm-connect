@@ -28,8 +28,8 @@ import {
   removeFavourite,
   sendEnquiry,
   setEnquiryStatus,
-  submitReport,
 } from "@/services/client/interactions";
+import { submitReport } from "@/services/server/reports";
 import { createProduct, newProductId } from "@/services/client/products";
 
 /**
@@ -314,18 +314,24 @@ describe("buyer flows", () => {
 
   it("reports a product and a farm, and sees only their own reports", async () => {
     await signInAs(buyer.email);
-    await submitReport({
-      targetType: "product",
-      targetId: p.cherry,
-      reason: "wrong_price_or_quantity",
-      details: "Price on the listing is wrong.",
-    });
-    await submitReport({
-      targetType: "farmer",
-      targetId: farmer.uid,
-      reason: "non_delivery",
-      details: "Paid but never delivered.",
-    });
+    await submitReport(
+      { uid: buyer.uid, role: "consumer" },
+      {
+        targetType: "product",
+        targetId: p.cherry,
+        reason: "wrong_price_or_quantity",
+        details: "Price on the listing is wrong.",
+      },
+    );
+    await submitReport(
+      { uid: buyer.uid, role: "consumer" },
+      {
+        targetType: "farmer",
+        targetId: farmer.uid,
+        reason: "non_delivery",
+        details: "Paid but never delivered.",
+      },
+    );
     const reports = await listConsumerReports(buyer.uid);
     expect(reports.map((r) => r.targetLabel?.en)).toEqual([
       `Farm ${RUN}`,

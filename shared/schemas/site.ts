@@ -48,6 +48,13 @@ export type Featured = z.infer<typeof featuredSchema>;
  */
 export const moderationSettingsSchema = z.object({
   listingsRequireApproval: z.boolean(),
+  /** Users may appeal enforcement actions (default on). */
+  appealsEnabled: z.boolean().optional(),
+  /**
+   * Admins may pause the appeal on a specific action while an investigation
+   * is under way, with a recorded justification (default off).
+   */
+  allowAppealHold: z.boolean().optional(),
   updatedAt: z.date().optional(),
   updatedBy: idSchema.optional(),
 });

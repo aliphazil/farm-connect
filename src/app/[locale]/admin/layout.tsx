@@ -21,6 +21,7 @@ export default async function AdminLayout({
         { href: href("/admin/buyers"), label: t.buyers },
         { href: href("/admin/products"), label: t.listings },
         { href: href("/admin/reports"), label: t.reports },
+        { href: href("/admin/appeals"), label: t.appeals },
         { href: href("/admin/reference"), label: t.reference },
         { href: href("/admin/settings"), label: t.settings },
         { href: href("/admin/logs"), label: t.logs },

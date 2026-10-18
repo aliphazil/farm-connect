@@ -17,6 +17,8 @@ import { COLLECTIONS, SITE_SETTINGS_DOCS } from "@shared/firestore-paths";
 import { dictionaries } from "@shared/i18n";
 import { islandIdFor } from "@shared/island-id";
 import {
+  REPORT_OUTCOMES,
+  REPORT_REASONS,
   REPORT_STATUSES,
   brandingInputSchema,
   islandInputSchema,
@@ -31,9 +33,14 @@ import {
   type ProductModeration,
   type ReferenceLabelInput,
   type ReportStatus,
+  type ReportOutcome,
+  type ReportReason,
+  type EnforcementType,
+  type EnforcementStatus,
 } from "@shared/schemas";
 import { getAdminAuth, getAdminDb } from "@/lib/firebase/admin";
 import { addAdminLog, addModerationAction, col, serverNow } from "./db";
+import { releaseGuard } from "./reports";
 
 /**
  * Privileged operations. Callers MUST pass an actor obtained from a verified
@@ -60,7 +67,9 @@ export type AdminErrorCode =
   | "cannot_target_admin"
   | "already_exists"
   | "in_use"
-  | "limit_reached";
+  | "limit_reached"
+  | "hold_not_allowed"
+  | "no_reported_user";
 
 export class AdminOperationError extends Error {
   constructor(public readonly code: AdminErrorCode) {
@@ -133,29 +142,187 @@ function assertNotSelf(actor: Actor, uid: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Account status: block, suspend, restore
+// Account enforcement: warn, restrict, suspend, block, restore, appeals
 // ---------------------------------------------------------------------------
 
+/** Extra context for an enforcement action. */
+export type EnforcementOptions = {
+  /** The report this action came from. */
+  reportId?: string;
+  /** Admin-only note (never shown to the user). */
+  internalNote?: string;
+  /**
+   * Pause the user's appeal while an investigation runs, with a reason the
+   * user sees. Only when the platform policy allows it.
+   */
+  holdAppeal?: string;
+};
+
+type Batchish = {
+  set(
+    ref: FirebaseFirestore.DocumentReference,
+    data: FirebaseFirestore.DocumentData,
+  ): unknown;
+};
+
+async function appealPolicy() {
+  const snap = await col(COLLECTIONS.siteSettings)
+    .doc(SITE_SETTINGS_DOCS.moderation)
+    .get();
+  return {
+    appealsEnabled: snap.get("appealsEnabled") !== false,
+    allowAppealHold: snap.get("allowAppealHold") === true,
+  };
+}
+
+/** Validates options; returns the appeal block for a new action. */
+async function appealFields(opts: EnforcementOptions) {
+  const hold = opts.holdAppeal?.trim();
+  if (!hold) return { status: "none" };
+  if (hold.length < 3 || hold.length > 500)
+    throw new AdminOperationError("invalid_input");
+  if (!(await appealPolicy()).allowAppealHold)
+    throw new AdminOperationError("hold_not_allowed");
+  return { status: "none", heldUntilDecision: true, heldReason: hold };
+}
+
+/** Writes an enforcementActions record inside the caller's batch. Returns its id. */
+function recordEnforcement(
+  batch: Batchish,
+  entry: {
+    userId: string;
+    type: EnforcementType;
+    reason: string;
+    createdBy: string;
+    restrictions?: AccountRestriction[];
+    expiresAt?: Date;
+    appeal: Record<string, unknown>;
+    opts: EnforcementOptions;
+  },
+): string {
+  const ref = col(COLLECTIONS.enforcementActions).doc();
+  batch.set(ref, {
+    userId: entry.userId,
+    type: entry.type,
+    reason: entry.reason,
+    ...(entry.opts.internalNote?.trim()
+      ? { internalNote: entry.opts.internalNote.trim().slice(0, 2000) }
+      : {}),
+    ...(entry.restrictions ? { restrictions: entry.restrictions } : {}),
+    ...(entry.opts.reportId ? { reportId: entry.opts.reportId } : {}),
+    ...(entry.expiresAt ? { expiresAt: entry.expiresAt } : {}),
+    createdBy: entry.createdBy,
+    createdAt: serverNow(),
+    status: "active",
+    appeal: entry.appeal,
+  });
+  return ref.id;
+}
+
+/** Ends the user's active actions of the given types (lifted, expired or overturned). */
+async function endActiveActions(
+  batch: {
+    update(
+      ref: FirebaseFirestore.DocumentReference,
+      data: FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData>,
+    ): unknown;
+  },
+  userId: string,
+  types: EnforcementType[],
+  status: Exclude<EnforcementStatus, "active">,
+  endedBy: string,
+  endReason?: string,
+  exceptId?: string,
+) {
+  const snap = await col(COLLECTIONS.enforcementActions)
+    .where("userId", "==", userId)
+    .where("status", "==", "active")
+    .get();
+  for (const doc of snap.docs) {
+    if (doc.id === exceptId || !types.includes(doc.get("type"))) continue;
+    batch.update(doc.ref, {
+      status,
+      endedAt: serverNow(),
+      endedBy,
+      ...(endReason ? { endReason } : {}),
+    });
+  }
+}
+
 /**
- * Blocks an account indefinitely: disables sign-in, revokes sessions, marks
- * the account blocked in claims and Firestore, and hides a farmer's farm and
- * products. Owners only.
+ * A warning: recorded and shown to the user in their account notices.
+ * Nothing else about the account changes.
  */
-export async function blockUser(actor: Actor, uid: string, reason: string) {
+export async function warnUser(
+  actor: Actor,
+  uid: string,
+  reason: string,
+  opts: EnforcementOptions = {},
+): Promise<string> {
+  assertCan(actor, "users.moderate");
+  assertNotSelf(actor, uid);
+  const why = cleanReason(reason, 3, 1000);
+  await loadTarget(uid);
+  const appeal = await appealFields(opts);
+  const batch = getAdminDb().batch();
+  const actionId = recordEnforcement(batch, {
+    userId: uid,
+    type: "warning",
+    reason: why,
+    createdBy: actor.uid,
+    appeal,
+    opts,
+  });
+  addModerationAction(batch, {
+    actorId: actor.uid,
+    action: "user.warn",
+    targetType: "user",
+    targetId: uid,
+    reason: why,
+    reportId: opts.reportId,
+  });
+  addAdminLog(batch, {
+    actorId: actor.uid,
+    action: "user.warn",
+    targetType: "user",
+    targetId: uid,
+    details: {
+      actionId,
+      ...(opts.reportId ? { reportId: opts.reportId } : {}),
+    },
+  });
+  await batch.commit();
+  return actionId;
+}
+
+/**
+ * Blocks an account indefinitely: revokes sessions, sets the `blocked` claim
+ * and users.status = "blocked" (Security Rules then refuse every write, and
+ * the session endpoint refuses to sign them in), and hides a farmer's farm
+ * and products. Sign-in to Firebase itself stays possible so the person can
+ * read the reason and appeal; nothing else works. Records, invoices,
+ * payments and reports are kept. Owners only.
+ */
+export async function blockUser(
+  actor: Actor,
+  uid: string,
+  reason: string,
+  opts: EnforcementOptions = {},
+): Promise<string> {
   assertCan(actor, "users.block");
   assertNotSelf(actor, uid);
   const why = cleanReason(reason);
   const { authUser, role } = await loadTarget(uid);
+  const appeal = await appealFields(opts);
   const auth = getAdminAuth();
 
-  // Auth first: from here the user can't sign in or refresh tokens.
+  // Auth first: from here existing sessions and refresh tokens stop working.
   const claims: Record<string, unknown> = {
     ...authUser.customClaims,
     blocked: true,
   };
   delete claims.suspendedUntil;
   await auth.setCustomUserClaims(uid, claims);
-  await auth.updateUser(uid, { disabled: true });
   await auth.revokeRefreshTokens(uid);
 
   const batch = getAdminDb().batch();
@@ -171,37 +338,57 @@ export async function blockUser(actor: Actor, uid: string, reason: string) {
       updatedAt: serverNow(),
     });
   }
+  // A block replaces any suspension in force.
+  await endActiveActions(
+    batch,
+    uid,
+    ["suspension"],
+    "lifted",
+    actor.uid,
+    "Replaced by a block",
+  );
+  const actionId = recordEnforcement(batch, {
+    userId: uid,
+    type: "block",
+    reason: why,
+    createdBy: actor.uid,
+    appeal,
+    opts,
+  });
   addModerationAction(batch, {
     actorId: actor.uid,
     action: "user.block",
     targetType: "user",
     targetId: uid,
     reason: why,
+    reportId: opts.reportId,
   });
   addAdminLog(batch, {
     actorId: actor.uid,
     action: "user.block",
     targetType: "user",
     targetId: uid,
-    details: { reason: why },
+    details: { reason: why, actionId },
   });
   await batch.commit();
 
   if (role === "farmer") await syncFarmerVisibility(uid, false);
+  return actionId;
 }
 
 /**
  * Suspends an account for `days`. Sessions are revoked and writes stop at
  * once (rules require status "active"); a farmer's farm and products are
- * hidden. Sign-in isn't disabled, so the suspension lifts itself at the
- * first sign-in after it ends (liftExpiredSuspension), or an admin lifts it.
+ * hidden. The suspension lifts itself at the first sign-in after it ends
+ * (liftExpiredSuspension), or an admin lifts it.
  */
 export async function suspendUser(
   actor: Actor,
   uid: string,
   days: number,
   reason: string,
-) {
+  opts: EnforcementOptions = {},
+): Promise<Date> {
   assertCan(actor, "users.moderate");
   assertNotSelf(actor, uid);
   if (!(SUSPENSION_DAYS as readonly number[]).includes(days))
@@ -209,6 +396,7 @@ export async function suspendUser(
   const why = cleanReason(reason);
   const { authUser, role, status } = await loadTarget(uid);
   if (status === "blocked") throw new AdminOperationError("invalid_state");
+  const appeal = await appealFields(opts);
   const until = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
   const auth = getAdminAuth();
 
@@ -231,6 +419,23 @@ export async function suspendUser(
       updatedAt: serverNow(),
     });
   }
+  await endActiveActions(
+    batch,
+    uid,
+    ["suspension"],
+    "lifted",
+    actor.uid,
+    "Replaced by a new suspension",
+  );
+  const actionId = recordEnforcement(batch, {
+    userId: uid,
+    type: "suspension",
+    reason: why,
+    createdBy: actor.uid,
+    expiresAt: until,
+    appeal,
+    opts,
+  });
   addModerationAction(batch, {
     actorId: actor.uid,
     action: "user.suspend",
@@ -238,13 +443,14 @@ export async function suspendUser(
     targetId: uid,
     reason: why,
     until,
+    reportId: opts.reportId,
   });
   addAdminLog(batch, {
     actorId: actor.uid,
     action: "user.suspend",
     targetType: "user",
     targetId: uid,
-    details: { reason: why, days, until: until.toISOString() },
+    details: { reason: why, days, until: until.toISOString(), actionId },
   });
   await batch.commit();
 
@@ -252,19 +458,21 @@ export async function suspendUser(
   return until;
 }
 
-/** Shared by restoreUser and the automatic lifting of expired suspensions. */
+/** Shared by restoreUser, appeal overturns and lifting expired suspensions. */
 async function restoreAccount(
   actorId: string,
   uid: string,
   role: string,
   claimsIn: Record<string, unknown> | undefined,
-  reason?: string,
+  reason: string | undefined,
+  endStatus: Exclude<EnforcementStatus, "active"> = "lifted",
 ) {
   const auth = getAdminAuth();
   const claims = { ...claimsIn };
   delete claims.blocked;
   delete claims.suspendedUntil;
   await auth.setCustomUserClaims(uid, claims);
+  // Older blocks disabled sign-in; make sure it's enabled again.
   await auth.updateUser(uid, { disabled: false });
 
   const batch = getAdminDb().batch();
@@ -285,6 +493,14 @@ async function restoreAccount(
       batch.update(farm.ref, { visible: true, updatedAt: serverNow() });
     }
   }
+  await endActiveActions(
+    batch,
+    uid,
+    ["suspension", "block"],
+    endStatus,
+    actorId,
+    reason,
+  );
   addModerationAction(batch, {
     actorId,
     action: "user.restore",
@@ -343,6 +559,7 @@ export async function liftExpiredSuspension(uid: string): Promise<boolean> {
     snap.get("role"),
     authUser.customClaims,
     "Suspension ended",
+    "expired",
   );
   return true;
 }
@@ -361,14 +578,16 @@ export async function liftAllExpiredSuspensions(actor: Actor): Promise<number> {
 
 /**
  * Switches individual features off (or back on) for an account. Enforced in
- * Security Rules via `users.restrictions`.
+ * Security Rules via `users.restrictions`. The new set replaces earlier
+ * restriction records (which are marked lifted).
  */
 export async function setRestrictions(
   actor: Actor,
   uid: string,
   restrictions: AccountRestriction[],
   reason: string,
-) {
+  opts: EnforcementOptions = {},
+): Promise<string | undefined> {
   assertCan(actor, "users.moderate");
   assertNotSelf(actor, uid);
   const list = [...new Set(restrictions)];
@@ -376,14 +595,27 @@ export async function setRestrictions(
     !list.every((r) => (ACCOUNT_RESTRICTIONS as readonly string[]).includes(r))
   )
     throw new AdminOperationError("invalid_input");
-  const why = cleanReason(reason);
+  const why = cleanReason(reason, 3, 1000);
   await loadTarget(uid);
+  const appeal = list.length ? await appealFields(opts) : null;
 
   const batch = getAdminDb().batch();
   batch.update(col(COLLECTIONS.users).doc(uid), {
     restrictions: list.length ? list : FieldValue.delete(),
     updatedAt: serverNow(),
   });
+  await endActiveActions(batch, uid, ["restriction"], "lifted", actor.uid, why);
+  const actionId = appeal
+    ? recordEnforcement(batch, {
+        userId: uid,
+        type: "restriction",
+        reason: why,
+        restrictions: list,
+        createdBy: actor.uid,
+        appeal,
+        opts,
+      })
+    : undefined;
   addModerationAction(batch, {
     actorId: actor.uid,
     action: "user.restrict",
@@ -391,13 +623,102 @@ export async function setRestrictions(
     targetId: uid,
     reason: why,
     restrictions: list,
+    reportId: opts.reportId,
   });
   addAdminLog(batch, {
     actorId: actor.uid,
     action: "user.restrict",
     targetType: "user",
     targetId: uid,
-    details: { restrictions: list, reason: why },
+    details: {
+      restrictions: list,
+      reason: why,
+      ...(actionId ? { actionId } : {}),
+    },
+  });
+  await batch.commit();
+  return actionId;
+}
+
+/**
+ * Decides a pending appeal. Upholding keeps the action; overturning lifts it
+ * (restores the account, removes the restriction, or voids the warning).
+ * The permission needed matches the action: blocks need "users.block".
+ */
+export async function decideAppeal(
+  actor: Actor,
+  actionId: string,
+  outcome: "upheld" | "overturned",
+  note: string,
+) {
+  const ref = col(COLLECTIONS.enforcementActions).doc(actionId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new AdminOperationError("not_found");
+  const type = snap.get("type") as EnforcementType;
+  assertCan(actor, type === "block" ? "users.block" : "users.moderate");
+  const userId = snap.get("userId") as string;
+  assertNotSelf(actor, userId);
+  if (snap.get("appeal.status") !== "pending")
+    throw new AdminOperationError("invalid_state");
+  if (outcome !== "upheld" && outcome !== "overturned")
+    throw new AdminOperationError("invalid_input");
+  const why = cleanReason(note, 3, 1000);
+
+  if (outcome === "overturned" && snap.get("status") === "active") {
+    const target = await loadTarget(userId);
+    if (type === "suspension" || type === "block") {
+      if (target.status !== "active")
+        await restoreAccount(
+          actor.uid,
+          userId,
+          target.role,
+          target.authUser.customClaims,
+          why,
+          "overturned",
+        );
+    } else if (type === "restriction") {
+      const removed = (snap.get("restrictions") as string[] | undefined) ?? [];
+      const user = await col(COLLECTIONS.users).doc(userId).get();
+      const left = (
+        (user.get("restrictions") as string[] | undefined) ?? []
+      ).filter((r) => !removed.includes(r));
+      await col(COLLECTIONS.users)
+        .doc(userId)
+        .update({
+          restrictions: left.length ? left : FieldValue.delete(),
+          updatedAt: serverNow(),
+        });
+    }
+  }
+
+  const batch = getAdminDb().batch();
+  batch.update(ref, {
+    "appeal.status": outcome,
+    "appeal.decidedBy": actor.uid,
+    "appeal.decidedAt": serverNow(),
+    "appeal.outcomeNote": why,
+    ...(outcome === "overturned"
+      ? {
+          status: "overturned",
+          endedAt: serverNow(),
+          endedBy: actor.uid,
+          endReason: why,
+        }
+      : {}),
+  });
+  addModerationAction(batch, {
+    actorId: actor.uid,
+    action: outcome === "upheld" ? "appeal.uphold" : "appeal.overturn",
+    targetType: "user",
+    targetId: userId,
+    reason: why,
+  });
+  addAdminLog(batch, {
+    actorId: actor.uid,
+    action: "appeal.decide",
+    targetType: "user",
+    targetId: userId,
+    details: { actionId, type, outcome },
   });
   await batch.commit();
 }
@@ -696,7 +1017,26 @@ export async function setFeatured(
 // Reports
 // ---------------------------------------------------------------------------
 
-/** Moves a report through review. Closing (resolved/dismissed) needs an outcome note. */
+async function loadReport(reportId: string) {
+  const ref = col(COLLECTIONS.reports).doc(reportId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new AdminOperationError("not_found");
+  return { ref, snap };
+}
+
+const reportKey = (snap: FirebaseFirestore.DocumentSnapshot) => ({
+  reporterId: snap.get("reporterId") as string,
+  targetType: snap.get("targetType") as string,
+  targetId: snap.get("targetId") as string,
+});
+
+const isClosed = (status: string) =>
+  status === "resolved" || status === "dismissed";
+
+/**
+ * Moves a report between review states (start review, reopen) or closes it
+ * with an outcome note. Prefer decideReport for closing with a decision.
+ */
 export async function updateReport(
   actor: Actor,
   reportId: string,
@@ -706,23 +1046,26 @@ export async function updateReport(
   assertCan(actor, "reports.manage");
   if (!(REPORT_STATUSES as readonly string[]).includes(status))
     throw new AdminOperationError("invalid_input");
-  const closing = status === "resolved" || status === "dismissed";
+  const closing = isClosed(status);
   const note = closing
     ? cleanReason(resolution, 3, 2000)
     : resolution?.trim() || undefined;
-  const ref = col(COLLECTIONS.reports).doc(reportId);
-  const snap = await ref.get();
-  if (!snap.exists) throw new AdminOperationError("not_found");
-  if (snap.get("status") === status && !note)
-    throw new AdminOperationError("invalid_state");
+  const { ref, snap } = await loadReport(reportId);
+  const from = snap.get("status") as string;
+  if (from === status && !note) throw new AdminOperationError("invalid_state");
 
   const batch = getAdminDb().batch();
   batch.update(ref, {
     status,
     ...(note ? { resolution: note } : {}),
-    handledBy: actor.uid,
+    ...(closing
+      ? { handledBy: actor.uid, closedAt: serverNow(), outcome: "no_action" }
+      : { closedAt: FieldValue.delete() }),
     updatedAt: serverNow(),
   });
+  // Closing releases the duplicate guard; reopening takes it again.
+  if (!snap.get("internal") && closing !== isClosed(from))
+    releaseGuard(batch, reportKey(snap), !closing);
   addModerationAction(batch, {
     actorId: actor.uid,
     action:
@@ -741,9 +1084,305 @@ export async function updateReport(
     action: "report.update",
     targetType: "report",
     targetId: reportId,
-    details: { from: snap.get("status"), to: status },
+    details: { from, to: status },
   });
   await batch.commit();
+}
+
+/** Assigns a report to an administrator (or unassigns it with null). */
+export async function assignReport(
+  actor: Actor,
+  reportId: string,
+  assigneeId: string | null,
+) {
+  assertCan(actor, "reports.manage");
+  const { ref } = await loadReport(reportId);
+  if (assigneeId) {
+    const [authUser, user] = await Promise.all([
+      getAdminAuth()
+        .getUser(assigneeId)
+        .catch(() => null),
+      col(COLLECTIONS.users).doc(assigneeId).get(),
+    ]);
+    if (
+      authUser?.customClaims?.role !== "admin" ||
+      user.get("role") !== "admin"
+    )
+      throw new AdminOperationError("invalid_input");
+  }
+  const batch = getAdminDb().batch();
+  batch.update(ref, {
+    assigneeId: assigneeId ?? null,
+    updatedAt: serverNow(),
+  });
+  addModerationAction(batch, {
+    actorId: actor.uid,
+    action: "report.assign",
+    targetType: "report",
+    targetId: reportId,
+    reportId,
+  });
+  addAdminLog(batch, {
+    actorId: actor.uid,
+    action: "report.assign",
+    targetType: "report",
+    targetId: reportId,
+    details: { assigneeId: assigneeId ?? null },
+  });
+  await batch.commit();
+}
+
+/** A private note on a report: admins only, never the reporter or the reported party. */
+export async function addReportNote(
+  actor: Actor,
+  reportId: string,
+  body: string,
+) {
+  assertCan(actor, "reports.manage");
+  const text = cleanReason(body, 1, 4000);
+  const { ref } = await loadReport(reportId);
+  const batch = getAdminDb().batch();
+  batch.set(ref.collection("notes").doc(), {
+    authorId: actor.uid,
+    body: text,
+    createdAt: serverNow(),
+  });
+  addAdminLog(batch, {
+    actorId: actor.uid,
+    action: "report.note",
+    targetType: "report",
+    targetId: reportId,
+  });
+  await batch.commit();
+}
+
+/** Asks the reporter for more information; the report waits for their reply. */
+export async function requestReportInfo(
+  actor: Actor,
+  reportId: string,
+  question: string,
+) {
+  assertCan(actor, "reports.manage");
+  const text = cleanReason(question, 3, 2000);
+  const { ref, snap } = await loadReport(reportId);
+  if (isClosed(snap.get("status")) || snap.get("internal"))
+    throw new AdminOperationError("invalid_state");
+  const batch = getAdminDb().batch();
+  batch.set(ref.collection("messages").doc(), {
+    author: "admin",
+    authorId: actor.uid,
+    body: text,
+    createdAt: serverNow(),
+  });
+  batch.update(ref, { status: "awaiting_info", updatedAt: serverNow() });
+  addModerationAction(batch, {
+    actorId: actor.uid,
+    action: "report.request_info",
+    targetType: "report",
+    targetId: reportId,
+    reportId,
+  });
+  addAdminLog(batch, {
+    actorId: actor.uid,
+    action: "report.request_info",
+    targetType: "report",
+    targetId: reportId,
+  });
+  await batch.commit();
+}
+
+export type ReportDecision = {
+  close: "resolved" | "dismissed";
+  /** Note shown to the reporter. */
+  resolution: string;
+  outcome: ReportOutcome;
+  /** For account outcomes: the reason shown to the reported account. */
+  userReason?: string;
+  days?: number;
+  restrictions?: AccountRestriction[];
+  internalNote?: string;
+  holdAppeal?: string;
+};
+
+/**
+ * Records the decision on a report and closes it. Account outcomes are
+ * applied to the reported account (and need the matching permission:
+ * blocking needs an owner); "listing_removed" removes the reported listing.
+ */
+export async function decideReport(
+  actor: Actor,
+  reportId: string,
+  decision: ReportDecision,
+): Promise<string | undefined> {
+  assertCan(actor, "reports.manage");
+  const { ref, snap } = await loadReport(reportId);
+  if (isClosed(snap.get("status")))
+    throw new AdminOperationError("invalid_state");
+  if (!(REPORT_OUTCOMES as readonly string[]).includes(decision.outcome))
+    throw new AdminOperationError("invalid_input");
+  if (decision.close === "dismissed" && decision.outcome !== "no_action")
+    throw new AdminOperationError("invalid_input");
+  const resolution = cleanReason(decision.resolution, 3, 2000);
+  const reportedUserId = snap.get("reportedUserId") as string | undefined;
+  const productId = snap.get("productId") as string | undefined;
+  const opts: EnforcementOptions = {
+    reportId,
+    internalNote: decision.internalNote,
+    holdAppeal: decision.holdAppeal,
+  };
+  const accountOutcome = [
+    "warning",
+    "restriction",
+    "suspension",
+    "block",
+  ].includes(decision.outcome);
+  if (accountOutcome && !reportedUserId)
+    throw new AdminOperationError("no_reported_user");
+  if (decision.outcome === "listing_removed" && !productId)
+    throw new AdminOperationError("invalid_input");
+
+  let actionId: string | undefined;
+  const reason = decision.userReason ?? "";
+  switch (decision.outcome) {
+    case "warning":
+      actionId = await warnUser(actor, reportedUserId!, reason, opts);
+      break;
+    case "restriction": {
+      const user = await col(COLLECTIONS.users).doc(reportedUserId!).get();
+      const current =
+        (user.get("restrictions") as AccountRestriction[] | undefined) ?? [];
+      const add = decision.restrictions ?? [];
+      if (!add.length) throw new AdminOperationError("invalid_input");
+      actionId = await setRestrictions(
+        actor,
+        reportedUserId!,
+        [...current, ...add],
+        reason,
+        opts,
+      );
+      break;
+    }
+    case "suspension":
+      await suspendUser(
+        actor,
+        reportedUserId!,
+        decision.days ?? 0,
+        reason,
+        opts,
+      );
+      actionId = (
+        await col(COLLECTIONS.enforcementActions)
+          .where("userId", "==", reportedUserId)
+          .where("status", "==", "active")
+          .where("type", "==", "suspension")
+          .limit(1)
+          .get()
+      ).docs[0]?.id;
+      break;
+    case "block":
+      actionId = await blockUser(actor, reportedUserId!, reason, opts);
+      break;
+    case "listing_removed":
+      await setProductModeration(
+        actor,
+        productId!,
+        "removed",
+        reason || resolution,
+        reportId,
+      );
+      break;
+  }
+
+  const batch = getAdminDb().batch();
+  batch.update(ref, {
+    status: decision.close,
+    resolution,
+    outcome: decision.outcome,
+    ...(actionId ? { enforcementActionId: actionId } : {}),
+    handledBy: actor.uid,
+    closedAt: serverNow(),
+    updatedAt: serverNow(),
+  });
+  if (!snap.get("internal")) releaseGuard(batch, reportKey(snap), false);
+  addModerationAction(batch, {
+    actorId: actor.uid,
+    action: decision.close === "resolved" ? "report.resolve" : "report.dismiss",
+    targetType: "report",
+    targetId: reportId,
+    reason: resolution,
+    reportId,
+  });
+  addAdminLog(batch, {
+    actorId: actor.uid,
+    action: "report.decision",
+    targetType: "report",
+    targetId: reportId,
+    details: {
+      close: decision.close,
+      outcome: decision.outcome,
+      ...(actionId ? { actionId } : {}),
+      ...(reportedUserId ? { reportedUserId } : {}),
+    },
+  });
+  await batch.commit();
+  return actionId;
+}
+
+/**
+ * An internal moderation record: a report an administrator opens about an
+ * account or listing they noticed themselves. It joins the reports queue.
+ */
+export async function createInternalReport(
+  actor: Actor,
+  input: {
+    targetType: "user" | "product";
+    targetId: string;
+    reason: ReportReason;
+    details: string;
+  },
+): Promise<string> {
+  assertCan(actor, "reports.manage");
+  if (!(REPORT_REASONS as readonly string[]).includes(input.reason))
+    throw new AdminOperationError("invalid_input");
+  const details = cleanReason(input.details, 10, 2000);
+  let reportedUserId: string;
+  let productId: string | undefined;
+  if (input.targetType === "product") {
+    const p = await col(COLLECTIONS.products).doc(input.targetId).get();
+    if (!p.exists) throw new AdminOperationError("not_found");
+    reportedUserId = p.get("farmerId");
+    productId = input.targetId;
+  } else if (input.targetType === "user") {
+    await loadTarget(input.targetId);
+    reportedUserId = input.targetId;
+  } else throw new AdminOperationError("invalid_input");
+
+  const ref = col(COLLECTIONS.reports).doc();
+  const batch = getAdminDb().batch();
+  batch.set(ref, {
+    reporterId: actor.uid,
+    reporterRole: "admin",
+    internal: true,
+    targetType: input.targetType,
+    targetId: input.targetId,
+    reportedUserId,
+    ...(productId ? { productId } : {}),
+    reason: input.reason,
+    details,
+    status: "open",
+    assigneeId: actor.uid,
+    createdAt: serverNow(),
+    updatedAt: serverNow(),
+  });
+  addAdminLog(batch, {
+    actorId: actor.uid,
+    action: "report.create",
+    targetType: "report",
+    targetId: ref.id,
+    details: { internal: true, reportedUserId, reason: input.reason },
+  });
+  await batch.commit();
+  return ref.id;
 }
 
 // ---------------------------------------------------------------------------
@@ -803,17 +1442,52 @@ export async function setModerationSettings(
   if (typeof input.listingsRequireApproval !== "boolean")
     throw new AdminOperationError("invalid_input");
   const batch = getAdminDb().batch();
-  batch.set(col(COLLECTIONS.siteSettings).doc(SITE_SETTINGS_DOCS.moderation), {
-    listingsRequireApproval: input.listingsRequireApproval,
-    updatedAt: serverNow(),
-    updatedBy: actor.uid,
-  });
+  batch.set(
+    col(COLLECTIONS.siteSettings).doc(SITE_SETTINGS_DOCS.moderation),
+    {
+      listingsRequireApproval: input.listingsRequireApproval,
+      updatedAt: serverNow(),
+      updatedBy: actor.uid,
+    },
+    { merge: true },
+  );
   addAdminLog(batch, {
     actorId: actor.uid,
     action: "settings.update",
     targetType: "siteSettings",
     targetId: SITE_SETTINGS_DOCS.moderation,
     details: { listingsRequireApproval: input.listingsRequireApproval },
+  });
+  await batch.commit();
+}
+
+/** Appeal policy: whether appeals are open, and whether admins may pause one during an investigation. */
+export async function setAppealSettings(
+  actor: Actor,
+  input: { appealsEnabled?: boolean; allowAppealHold?: boolean },
+) {
+  assertCan(actor, "settings.manage");
+  const update: Record<string, boolean> = {};
+  for (const key of ["appealsEnabled", "allowAppealHold"] as const) {
+    if (input[key] === undefined) continue;
+    if (typeof input[key] !== "boolean")
+      throw new AdminOperationError("invalid_input");
+    update[key] = input[key];
+  }
+  if (!Object.keys(update).length)
+    throw new AdminOperationError("invalid_input");
+  const batch = getAdminDb().batch();
+  batch.set(
+    col(COLLECTIONS.siteSettings).doc(SITE_SETTINGS_DOCS.moderation),
+    { ...update, updatedAt: serverNow(), updatedBy: actor.uid },
+    { merge: true },
+  );
+  addAdminLog(batch, {
+    actorId: actor.uid,
+    action: "settings.update",
+    targetType: "siteSettings",
+    targetId: SITE_SETTINGS_DOCS.moderation,
+    details: update,
   });
   await batch.commit();
 }

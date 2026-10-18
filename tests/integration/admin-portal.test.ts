@@ -42,7 +42,8 @@ import {
   withReferenceLabels,
 } from "@/services/server/reference";
 import { completeRegistration } from "@/services/server/registration";
-import { sendEnquiry, submitReport } from "@/services/client/interactions";
+import { sendEnquiry } from "@/services/client/interactions";
+import { submitReport } from "@/services/server/reports";
 import {
   createProduct,
   newProductId,
@@ -273,12 +274,15 @@ describe("restrictions (enforced by Security Rules)", () => {
     const enquiry = { productId, quantity: 1, deliverTo: LOCATION };
     await expect(sendEnquiry(enquiry)).rejects.toThrow();
     await expect(
-      submitReport({
-        targetType: "product",
-        targetId: productId,
-        reason: "other",
-        details: "Testing reports.",
-      }),
+      submitReport(
+        { uid: buyer.uid, role: "consumer" },
+        {
+          targetType: "product",
+          targetId: productId,
+          reason: "other",
+          details: "Testing reports.",
+        },
+      ),
     ).rejects.toThrow();
     // Saving favourites isn't restricted.
     const fav = buildFavourite(
@@ -490,12 +494,15 @@ describe("listing review", () => {
 describe("reports", () => {
   it("move through review; closing needs an outcome the reporter can read", async () => {
     await signInAs(buyer.email);
-    await submitReport({
-      targetType: "farmer",
-      targetId: farmer.uid,
-      reason: "non_delivery",
-      details: "Paid but nothing arrived.",
-    });
+    await submitReport(
+      { uid: buyer.uid, role: "consumer" },
+      {
+        targetType: "farmer",
+        targetId: farmer.uid,
+        reason: "non_delivery",
+        details: "Paid but nothing arrived.",
+      },
+    );
     const awaiting = await listReports({
       status: "awaiting",
       targetType: "farmer",

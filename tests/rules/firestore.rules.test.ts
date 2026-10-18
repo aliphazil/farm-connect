@@ -929,53 +929,108 @@ describe("reports", () => {
     details: "Asked me to pay in advance and stopped answering.",
   };
 
-  it("can be filed by active members only", async () => {
-    await assertSucceeds(
-      addDoc(
-        collection(asConsumerC(), "reports"),
-        buildReportCreate(input, "consumerC", serverTimestamp()),
-      ),
-    );
-    await assertFails(
-      addDoc(
-        collection(asAnon(), "reports"),
-        buildReportCreate(input, "anon", serverTimestamp()),
-      ),
-    );
-    await assertFails(
-      addDoc(
-        collection(asBlockedD(), "reports"),
-        buildReportCreate(input, "blockedD", serverTimestamp()),
-      ),
-    );
+  it("can't be written by any client (the server validates and creates them)", async () => {
+    for (const [db, uid] of [
+      [asConsumerC(), "consumerC"],
+      [asFarmerA(), "farmerA"],
+      [asAdmin(), "adminE"],
+      [asAnon(), "anon"],
+    ] as const) {
+      await assertFails(
+        addDoc(
+          collection(db, "reports"),
+          buildReportCreate(input, uid, serverTimestamp()),
+        ),
+      );
+    }
   });
 
-  it("reject forged reporter, status or resolution", async () => {
-    const good = buildReportCreate(input, "consumerC", serverTimestamp());
-    const c = asConsumerC();
-    await assertFails(
-      addDoc(collection(c, "reports"), { ...good, reporterId: "farmerA" }),
-    );
-    await assertFails(
-      addDoc(collection(c, "reports"), { ...good, status: "resolved" }),
-    );
-    await assertFails(
-      addDoc(collection(c, "reports"), { ...good, resolution: "done" }),
-    );
-    await assertFails(
-      addDoc(collection(c, "reports"), { ...good, details: "short" }),
-    );
-  });
-
-  it("are private to the reporter and admins, and immutable for clients", async () => {
+  it("are private to the reporter and admins — never the reported party", async () => {
     await assertSucceeds(getDoc(doc(asConsumerC(), "reports/r1")));
     await assertSucceeds(getDoc(doc(asAdmin(), "reports/r1")));
+    // pA belongs to farmerA, the reported party.
     await assertFails(getDoc(doc(asFarmerA(), "reports/r1")));
+    await assertFails(
+      getDocs(
+        query(
+          collection(asFarmerA(), "reports"),
+          where("targetId", "==", "pA"),
+        ),
+      ),
+    );
     await assertFails(
       updateDoc(doc(asConsumerC(), "reports/r1"), { status: "resolved" }),
     );
     await assertFails(
       updateDoc(doc(asAdmin(), "reports/r1"), { status: "resolved" }),
+    );
+  });
+
+  it("internal notes are admin-only; messages are for the reporter and admins", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "reports/r1/notes/n1"), {
+        authorId: "adminE",
+        body: "Looks like a repeat offender",
+        createdAt: ts,
+      });
+      await setDoc(doc(db, "reports/r1/messages/m1"), {
+        author: "admin",
+        authorId: "adminE",
+        body: "Do you have a receipt?",
+        createdAt: ts,
+      });
+    });
+    await assertSucceeds(getDoc(doc(asAdmin(), "reports/r1/notes/n1")));
+    await assertFails(getDoc(doc(asConsumerC(), "reports/r1/notes/n1")));
+    await assertFails(getDoc(doc(asFarmerA(), "reports/r1/notes/n1")));
+    await assertSucceeds(getDoc(doc(asConsumerC(), "reports/r1/messages/m1")));
+    await assertSucceeds(getDoc(doc(asAdmin(), "reports/r1/messages/m1")));
+    await assertFails(getDoc(doc(asFarmerA(), "reports/r1/messages/m1")));
+    await assertFails(
+      setDoc(doc(asConsumerC(), "reports/r1/messages/m2"), {
+        author: "reporter",
+        body: "hi",
+      }),
+    );
+    await assertFails(
+      setDoc(doc(asAdmin(), "reports/r1/notes/n2"), { body: "x" }),
+    );
+  });
+
+  it("enforcement records and report guards aren't readable or writable by members", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "enforcementActions/a1"), {
+        userId: "consumerC",
+        type: "warning",
+        reason: "Spam",
+        internalNote: "secret",
+        status: "active",
+      });
+      await setDoc(doc(db, "reportGuards/consumerC_product_pA"), {
+        open: true,
+      });
+    });
+    await assertSucceeds(getDoc(doc(asAdmin(), "enforcementActions/a1")));
+    // Even the warned user reads it only through server code (no internal notes).
+    await assertFails(getDoc(doc(asConsumerC(), "enforcementActions/a1")));
+    await assertFails(
+      updateDoc(doc(asConsumerC(), "enforcementActions/a1"), {
+        "appeal.status": "overturned",
+      }),
+    );
+    await assertFails(
+      setDoc(doc(asAdmin(), "enforcementActions/a2"), { userId: "x" }),
+    );
+    await assertFails(
+      getDoc(doc(asConsumerC(), "reportGuards/consumerC_product_pA")),
+    );
+    await assertFails(
+      deleteDoc(doc(asConsumerC(), "reportGuards/consumerC_product_pA")),
+    );
+    await assertFails(
+      setDoc(doc(asConsumerC(), "reportQuotas/consumerC"), { count: 0 }),
     );
   });
 });
@@ -1129,8 +1184,8 @@ describe("admin phase: restrictions, suspension, listing review, location integr
       serverTimestamp(),
     );
     await assertFails(addDoc(collection(asConsumerC(), "enquiries"), enquiry));
-    // Reports aren't restricted for this account.
-    await assertSucceeds(
+    // (Reports are now created only by server code, which checks restrictions.)
+    await assertFails(
       addDoc(
         collection(asConsumerC(), "reports"),
         buildReportCreate(

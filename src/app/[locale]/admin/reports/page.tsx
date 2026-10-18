@@ -6,7 +6,6 @@ import { getDictionary, getLocale } from "@/i18n/server";
 import { localeHref } from "@/i18n/paths";
 import { requireAdminPortal } from "@/lib/auth/portal-access";
 import { listReports } from "@/services/server/admin-queries";
-import { ReportActions } from "@/features/admin/components/report-actions";
 import {
   FilterBar,
   FilterSelect,
@@ -17,6 +16,8 @@ import {
   withQuery,
 } from "@/components/admin/admin-ui";
 import { EmptyState } from "@/components/ui/empty-state";
+import { buttonClasses } from "@/components/ui/button";
+import { fill } from "@shared/i18n/format";
 import { Badge, PageHeader } from "@/components/ui/layout-primitives";
 
 const STATUS_FILTERS = ["awaiting", ...REPORT_STATUSES] as const;
@@ -24,7 +25,7 @@ const STATUS_FILTERS = ["awaiting", ...REPORT_STATUSES] as const;
 export default async function AdminReportsPage({
   searchParams,
 }: PageProps<"/[locale]/admin/reports">) {
-  await requireAdminPortal();
+  const admin = await requireAdminPortal();
   const [locale, dict, params] = await Promise.all([
     getLocale(),
     getDictionary(),
@@ -39,19 +40,32 @@ export default async function AdminReportsPage({
       ? undefined
       : (oneOf(param(params, "status"), STATUS_FILTERS) ?? "awaiting");
   const targetType = oneOf(param(params, "type"), REPORT_TARGET_TYPES);
+  const assigneeParam = oneOf(param(params, "assignee"), [
+    "me",
+    "unassigned",
+  ] as const);
+  const assignee = assigneeParam === "me" ? admin.uid : assigneeParam;
   const after = param(params, "after");
-  const result = await listReports({ status, targetType, after });
+  const result = await listReports({ status, targetType, assignee, after });
   const hrefFor = (cursor?: string) =>
     withQuery(path, {
       status: status ?? "all",
       type: targetType,
+      assignee: assigneeParam,
       after: cursor,
     });
 
-  const targetHref = (type: string, id: string) =>
-    type === "product"
-      ? localeHref(locale, `/admin/products/${id}`)
-      : localeHref(locale, `/admin/users/${id}`);
+  const targetHref = (item: {
+    targetType: string;
+    targetId: string;
+    reportedUserId?: string;
+  }) =>
+    item.targetType === "product"
+      ? localeHref(locale, `/admin/products/${item.targetId}`)
+      : localeHref(
+          locale,
+          `/admin/users/${item.reportedUserId ?? item.targetId}`,
+        );
 
   return (
     <div className="flex flex-col gap-2">
@@ -79,6 +93,16 @@ export default async function AdminReportsPage({
             value: s,
             label: r.targetTypes[s],
           }))}
+        />
+        <FilterSelect
+          name="assignee"
+          label={r.assignee}
+          value={assigneeParam}
+          allLabel={r.anyone}
+          options={[
+            { value: "me", label: r.assignedToMe },
+            { value: "unassigned", label: r.unassigned },
+          ]}
         />
       </FilterBar>
 
@@ -113,7 +137,7 @@ export default async function AdminReportsPage({
                     </Badge>
                     {item.targetLabel ? (
                       <Link
-                        href={targetHref(item.targetType, item.targetId)}
+                        href={targetHref(item)}
                         className="text-primary hover:underline"
                       >
                         {typeof item.targetLabel === "string"
@@ -153,7 +177,27 @@ export default async function AdminReportsPage({
                   {item.resolution}
                 </p>
               ) : null}
-              <ReportActions reportId={item.id} status={item.status} t={t} />
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href={localeHref(locale, `/admin/reports/${item.id}`)}
+                  className={buttonClasses("primary", "sm")}
+                >
+                  {r.open}
+                </Link>
+                {item.internal ? (
+                  <Badge tone="warning">{r.internalRecord}</Badge>
+                ) : null}
+                {item.reporterRole ? (
+                  <Badge>{r.reporterRoles[item.reporterRole]}</Badge>
+                ) : null}
+                {item.evidencePaths?.length ? (
+                  <Badge>
+                    {fill(dict.accountReports.evidenceCount, {
+                      count: item.evidencePaths.length,
+                    })}
+                  </Badge>
+                ) : null}
+              </div>
             </li>
           ))}
         </ul>

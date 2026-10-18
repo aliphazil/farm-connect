@@ -18,7 +18,14 @@ import {
   adminLogSchema,
   consumerProfileSchema,
   farmerProfileSchema,
+  enforcementActionSchema,
   fraudReportSchema,
+  OPEN_REPORT_STATUSES,
+  reportMessageSchema,
+  reportNoteSchema,
+  type EnforcementAction,
+  type ReportMessage,
+  type ReportNote,
   productSchema,
   userSchema,
   type AdminLog,
@@ -531,7 +538,7 @@ export async function getUserDetail(
       count(col(COLLECTIONS.enquiries).where("consumerId", "==", uid)),
     ),
     safe(() => count(col(COLLECTIONS.enquiries).where("farmerId", "==", uid))),
-    reportsWhere("targetId", uid),
+    reportsAboutUser(uid),
     reportsWhere("reporterId", uid),
     historyFor(uid),
   ]);
@@ -699,9 +706,11 @@ export async function getProductDetail(
 // ---------------------------------------------------------------------------
 
 export type ReportFilters = {
-  /** "awaiting" = open or reviewing. */
+  /** "awaiting" = pending, under review or awaiting information. */
   status?: ReportStatus | "awaiting";
   targetType?: FraudReport["targetType"];
+  /** An admin uid, or "unassigned". */
+  assignee?: string;
   after?: string;
 };
 
@@ -716,8 +725,14 @@ export async function listReports(f: ReportFilters): Promise<{
 }> {
   let q: Query = col(COLLECTIONS.reports);
   if (f.targetType) q = q.where("targetType", "==", f.targetType);
+  if (f.assignee)
+    q = q.where(
+      "assigneeId",
+      "==",
+      f.assignee === "unassigned" ? null : f.assignee,
+    );
   if (f.status === "awaiting")
-    q = q.where("status", "in", ["open", "reviewing"]);
+    q = q.where("status", "in", [...OPEN_REPORT_STATUSES]);
   else if (f.status) q = q.where("status", "==", f.status);
   q = q.orderBy("createdAt", "desc");
   const res = await page(q, COLLECTIONS.reports, f.after, (d) =>
@@ -730,7 +745,11 @@ export async function listReports(f: ReportFilters): Promise<{
       ? col(COLLECTIONS.products).doc(r.targetId)
       : r.targetType === "farmer"
         ? col(COLLECTIONS.farmerProfiles).doc(r.targetId)
-        : col(COLLECTIONS.users).doc(r.targetId),
+        : col(COLLECTIONS.users).doc(
+            r.targetType === "enquiry"
+              ? (r.reportedUserId ?? r.targetId)
+              : r.targetId,
+          ),
   );
   const [targets, names] = await Promise.all([
     refs.length ? db.getAll(...refs) : Promise.resolve([]),
@@ -852,7 +871,205 @@ export async function getModerationSettings() {
     .get();
   return {
     listingsRequireApproval: snap.get("listingsRequireApproval") === true,
+    appealsEnabled: snap.get("appealsEnabled") !== false,
+    allowAppealHold: snap.get("allowAppealHold") === true,
   };
 }
 
 export { getFeaturedIds };
+
+// ---------------------------------------------------------------------------
+// Report detail, enforcement and appeals
+// ---------------------------------------------------------------------------
+
+/** Reports about an account: new ones by reportedUserId, older ones by targetId. */
+async function reportsAboutUser(uid: string): Promise<FraudReport[]> {
+  const [a, b] = await Promise.all([
+    reportsWhere("reportedUserId", uid),
+    reportsWhere("targetId", uid),
+  ]);
+  const byId = new Map([...a, ...b].map((r) => [r.id, r]));
+  return [...byId.values()].sort(
+    (x, y) => y.createdAt.getTime() - x.createdAt.getTime(),
+  );
+}
+
+export type AdminRef = { uid: string; name: string };
+
+/** Administrators (for the assign menu). */
+export async function listAdmins(): Promise<AdminRef[]> {
+  const snap = await col(COLLECTIONS.users)
+    .where("role", "==", "admin")
+    .limit(50)
+    .get();
+  return snap.docs.map((d) => ({
+    uid: d.id,
+    name: (d.get("displayName") as string) ?? d.id,
+  }));
+}
+
+export type AdminReportDetail = {
+  report: FraudReport;
+  reporter: { uid: string; name: string; role?: string; status?: string };
+  reportedUser: {
+    uid: string;
+    name: string;
+    role?: string;
+    status?: string;
+  } | null;
+  product: { id: string; title: LocalizedText } | null;
+  enquiry: {
+    id: string;
+    quantity: number;
+    message?: string;
+    status: string;
+    createdAt: Date;
+  } | null;
+  messages: (ReportMessage & { authorName: string })[];
+  notes: (ReportNote & { authorName: string })[];
+  history: HistoryEntry[];
+  assigneeName: string | null;
+  admins: AdminRef[];
+};
+
+export async function getReportDetail(
+  id: string,
+): Promise<AdminReportDetail | null> {
+  const ref = col(COLLECTIONS.reports).doc(id);
+  const snap = await ref.get();
+  const r = tryParse(() => snapToModel(fraudReportSchema, snap));
+  if (!r) return null;
+  const db = getAdminDb();
+  const [
+    userSnaps,
+    productSnap,
+    enquirySnap,
+    msgSnap,
+    noteSnap,
+    history,
+    admins,
+  ] = await Promise.all([
+    db.getAll(
+      col(COLLECTIONS.users).doc(r.reporterId),
+      col(COLLECTIONS.users).doc(r.reportedUserId ?? r.reporterId),
+    ),
+    r.productId ? col(COLLECTIONS.products).doc(r.productId).get() : null,
+    r.enquiryId ? col(COLLECTIONS.enquiries).doc(r.enquiryId).get() : null,
+    ref.collection("messages").orderBy("createdAt", "asc").limit(100).get(),
+    ref.collection("notes").orderBy("createdAt", "desc").limit(100).get(),
+    historyFor(id),
+    listAdmins(),
+  ]);
+  const [reporterSnap, reportedSnap] = userSnaps;
+  const messages = msgSnap.docs
+    .map((d) => tryParse(() => snapToModel(reportMessageSchema, d)))
+    .filter((m): m is ReportMessage => m !== null);
+  const notes = noteSnap.docs
+    .map((d) => tryParse(() => snapToModel(reportNoteSchema, d)))
+    .filter((n): n is ReportNote => n !== null);
+  const names = await actorNames([
+    ...messages.map((m) => m.authorId),
+    ...notes.map((n) => n.authorId),
+    ...(r.assigneeId ? [r.assigneeId] : []),
+  ]);
+  const person = (s: FirebaseFirestore.DocumentSnapshot) => ({
+    uid: s.id,
+    name: (s.get("displayName") as string) ?? s.id,
+    role: s.get("role") as string | undefined,
+    status: s.get("status") as string | undefined,
+  });
+  return {
+    report: r,
+    reporter: person(reporterSnap),
+    reportedUser:
+      r.reportedUserId && reportedSnap.exists ? person(reportedSnap) : null,
+    product: productSnap?.exists
+      ? { id: productSnap.id, title: productSnap.get("title") as LocalizedText }
+      : null,
+    enquiry: enquirySnap?.exists
+      ? {
+          id: enquirySnap.id,
+          quantity: enquirySnap.get("quantity"),
+          message: enquirySnap.get("message"),
+          status: enquirySnap.get("status"),
+          createdAt: enquirySnap.get("createdAt")?.toDate?.() ?? new Date(0),
+        }
+      : null,
+    messages: messages.map((m) => ({
+      ...m,
+      authorName: names.get(m.authorId) ?? m.authorId,
+    })),
+    notes: notes.map((n) => ({
+      ...n,
+      authorName: names.get(n.authorId) ?? n.authorId,
+    })),
+    history,
+    assigneeName: r.assigneeId
+      ? (names.get(r.assigneeId) ?? r.assigneeId)
+      : null,
+    admins,
+  };
+}
+
+export type EnforcementRow = EnforcementAction & { createdByName: string };
+
+const parseAction = (d: DocumentSnapshot) =>
+  tryParse(() => snapToModel(enforcementActionSchema, d));
+
+async function withActorNames(
+  actions: EnforcementAction[],
+): Promise<EnforcementRow[]> {
+  const names = await actorNames(actions.map((a) => a.createdBy));
+  return actions.map((a) => ({
+    ...a,
+    createdByName: names.get(a.createdBy) ?? a.createdBy,
+  }));
+}
+
+/** An account's enforcement history (admin view, includes internal notes). */
+export async function listEnforcementFor(
+  uid: string,
+): Promise<EnforcementRow[]> {
+  const snap = await col(COLLECTIONS.enforcementActions)
+    .where("userId", "==", uid)
+    .orderBy("createdAt", "desc")
+    .limit(50)
+    .get();
+  return withActorNames(
+    snap.docs
+      .map(parseAction)
+      .filter((a): a is EnforcementAction => a !== null),
+  );
+}
+
+export type AppealRow = EnforcementRow & {
+  userName: string;
+  userRole?: string;
+};
+
+/** Appeals waiting for a decision, oldest first. */
+export async function listPendingAppeals(): Promise<AppealRow[]> {
+  const snap = await col(COLLECTIONS.enforcementActions)
+    .where("appeal.status", "==", "pending")
+    .orderBy("appeal.submittedAt", "asc")
+    .limit(100)
+    .get();
+  const actions = await withActorNames(
+    snap.docs
+      .map(parseAction)
+      .filter((a): a is EnforcementAction => a !== null),
+  );
+  const users = actions.length
+    ? await getAdminDb().getAll(
+        ...[...new Set(actions.map((a) => a.userId))].map((id) =>
+          col(COLLECTIONS.users).doc(id),
+        ),
+      )
+    : [];
+  const byId = new Map(users.map((u) => [u.id, u]));
+  return actions.map((a) => ({
+    ...a,
+    userName: (byId.get(a.userId)?.get("displayName") as string) ?? a.userId,
+    userRole: byId.get(a.userId)?.get("role") as string | undefined,
+  }));
+}

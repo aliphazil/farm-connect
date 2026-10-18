@@ -4,6 +4,7 @@ import { localeHref } from "@/i18n/paths";
 import { requireConsumerPortal } from "@/lib/auth/portal-access";
 import { getConsumerOverview } from "@/services/server/consumer";
 import { Alert } from "@/components/ui/alert";
+import { NoticeBanner } from "@/components/layout/notice-banner";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, PageHeader } from "@/components/ui/layout-primitives";
 
@@ -43,6 +44,7 @@ export default async function ConsumerHome() {
           </ButtonLink>
         }
       />
+      <NoticeBanner uid={user.uid} dict={dict} locale={locale} />
       {!user.emailVerified ? (
         <Alert tone="info">{dict.auth.verifyEmail}</Alert>
       ) : null}

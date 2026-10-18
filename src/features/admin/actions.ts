@@ -13,6 +13,7 @@ import type {
   PaymentVerification,
   ProductModeration,
   ReferenceLabelInput,
+  ReportReason,
   ReportStatus,
 } from "@shared/schemas";
 import { AuthorizationError, assertAdminPermission } from "@/lib/auth/session";
@@ -63,8 +64,12 @@ async function run(
 
 // ---------- accounts ----------
 
-export async function blockUserAction(uid: string, reason: string) {
-  return run("users.block", (a) => admin.blockUser(a, uid, reason), [
+export async function blockUserAction(
+  uid: string,
+  reason: string,
+  opts: admin.EnforcementOptions = {},
+) {
+  return run("users.block", (a) => admin.blockUser(a, uid, reason, opts), [
     "catalog",
   ]);
 }
@@ -73,10 +78,13 @@ export async function suspendUserAction(
   uid: string,
   days: number,
   reason: string,
+  opts: admin.EnforcementOptions = {},
 ) {
-  return run("users.moderate", (a) => admin.suspendUser(a, uid, days, reason), [
-    "catalog",
-  ]);
+  return run(
+    "users.moderate",
+    (a) => admin.suspendUser(a, uid, days, reason, opts),
+    ["catalog"],
+  );
 }
 
 export async function restoreUserAction(uid: string, reason?: string) {
@@ -90,9 +98,10 @@ export async function setRestrictionsAction(
   uid: string,
   restrictions: AccountRestriction[],
   reason: string,
+  opts: admin.EnforcementOptions = {},
 ) {
   return run("users.moderate", (a) =>
-    admin.setRestrictions(a, uid, restrictions, reason),
+    admin.setRestrictions(a, uid, restrictions, reason, opts),
   );
 }
 
@@ -226,4 +235,78 @@ export async function deleteIslandAction(islandId: string) {
     "geography",
     "catalog",
   ]);
+}
+
+// ---------- enforcement and appeals ----------
+
+export async function warnUserAction(
+  uid: string,
+  reason: string,
+  opts: admin.EnforcementOptions = {},
+) {
+  return run("users.moderate", (a) => admin.warnUser(a, uid, reason, opts));
+}
+
+export async function decideAppealAction(
+  actionId: string,
+  outcome: "upheld" | "overturned",
+  note: string,
+) {
+  // The service requires users.block for appeals against blocks.
+  return run(
+    "users.moderate",
+    (a) => admin.decideAppeal(a, actionId, outcome, note),
+    ["catalog"],
+  );
+}
+
+export async function setAppealSettingsAction(input: {
+  appealsEnabled?: boolean;
+  allowAppealHold?: boolean;
+}) {
+  return run("settings.manage", (a) => admin.setAppealSettings(a, input));
+}
+
+// ---------- report workflow ----------
+
+export async function assignReportAction(
+  reportId: string,
+  assigneeId: string | null,
+) {
+  return run("reports.manage", (a) =>
+    admin.assignReport(a, reportId, assigneeId),
+  );
+}
+
+export async function addReportNoteAction(reportId: string, body: string) {
+  return run("reports.manage", (a) => admin.addReportNote(a, reportId, body));
+}
+
+export async function requestReportInfoAction(
+  reportId: string,
+  question: string,
+) {
+  return run("reports.manage", (a) =>
+    admin.requestReportInfo(a, reportId, question),
+  );
+}
+
+export async function decideReportAction(
+  reportId: string,
+  decision: admin.ReportDecision,
+) {
+  return run(
+    "reports.manage",
+    (a) => admin.decideReport(a, reportId, decision),
+    ["catalog"],
+  );
+}
+
+export async function createInternalReportAction(input: {
+  targetType: "user" | "product";
+  targetId: string;
+  reason: ReportReason;
+  details: string;
+}) {
+  return run("reports.manage", (a) => admin.createInternalReport(a, input));
 }

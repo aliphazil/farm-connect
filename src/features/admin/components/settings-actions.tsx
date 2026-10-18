@@ -4,6 +4,7 @@ import type { Dictionary } from "@shared/i18n";
 import { fill } from "@shared/i18n/format";
 import {
   liftExpiredSuspensionsAction,
+  setAppealSettingsAction,
   setModerationSettingsAction,
 } from "../actions";
 import { ConfirmAction } from "./confirm-action";
@@ -41,6 +42,38 @@ export function LiftSuspensions({ t }: { t: Dictionary["admin"] }) {
       title={d.liftNow}
       onConfirm={() => liftExpiredSuspensionsAction()}
       success={(r) => fill(d.lifted, { count: r.ok ? (r.count ?? 0) : 0 })}
+    />
+  );
+}
+
+/** Opens/closes appeals, or allows/disallows pausing appeals during investigations. */
+export function AppealSettingToggle({
+  setting,
+  enabled,
+  t,
+}: {
+  setting: "appealsEnabled" | "allowAppealHold";
+  enabled: boolean;
+  t: Dictionary["admin"];
+}) {
+  const s = t.settings;
+  const body =
+    setting === "appealsEnabled"
+      ? enabled
+        ? s.appealsConfirmOff
+        : s.appealsConfirmOn
+      : enabled
+        ? s.holdConfirmOff
+        : s.holdConfirmOn;
+  return (
+    <ConfirmAction
+      t={t}
+      tone={enabled ? "secondary" : "primary"}
+      label={enabled ? s.turnOff : s.turnOn}
+      title={setting === "appealsEnabled" ? s.appeals : s.hold}
+      body={body}
+      onConfirm={() => setAppealSettingsAction({ [setting]: !enabled })}
+      success={s.saved}
     />
   );
 }

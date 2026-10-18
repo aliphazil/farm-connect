@@ -403,25 +403,32 @@ service cloud.firestore {
     }
 
     // ---------- reports & moderation ----------
+    // Reports are created and updated only by server code (src/services/server/
+    // reports.ts and admin.ts), which validates the target, prevents
+    // duplicates, rate-limits and checks evidence. The reported party can
+    // never read a report.
     match /reports/{reportId} {
       allow read: if signedIn() && (resource.data.reporterId == uid() || isAdmin());
-      allow create: if isActiveMember()
-        && data().keys().hasAll(['reporterId', 'targetType', 'targetId', 'reason', 'details', 'status',
-                                 'createdAt', 'updatedAt'])
-        && data().keys().hasOnly(['reporterId', 'targetType', 'targetId', 'reason', 'details', 'status',
-                                  'createdAt', 'updatedAt'])
-        && data().reporterId == uid()
-        && notRestricted('reports')
-        && data().status == 'open'
-        && data().targetType in ['product', 'user', 'farmer']
-        && str(data().targetId, 1, 128)
-        && data().reason in ['fraud_scam', 'fake_listing', 'wrong_price_or_quantity', 'non_delivery',
-                             'abusive_behaviour', 'prohibited_item', 'other']
-        && str(data().details, 10, 2000)
-        && stampedNow('createdAt')
-        && stampedNow('updatedAt');
-      // Status, resolution and handledBy are set by admins via server code.
-      allow update, delete: if false;
+      allow write: if false;
+
+      // Admin ↔ reporter messages (requests for information and replies).
+      match /messages/{messageId} {
+        allow read: if isAdmin()
+          || (signedIn()
+            && get(/databases/$(database)/documents/reports/$(reportId)).data.reporterId == uid());
+        allow write: if false;
+      }
+      // Private admin notes: never visible to the reporter or the reported party.
+      match /notes/{noteId} {
+        allow read: if isAdmin();
+        allow write: if false;
+      }
+    }
+    // Warnings, restrictions, suspensions and blocks. Users see their own
+    // through server code, which leaves out internal notes.
+    match /enforcementActions/{actionId} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
     match /moderationActions/{actionId} {
       allow read: if isAdmin();

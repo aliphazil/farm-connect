@@ -617,14 +617,34 @@
       "non_delivery": "Paid but not delivered",
       "abusive_behaviour": "Abusive behaviour",
       "prohibited_item": "Prohibited or unsafe item",
-      "other": "Something else"
+      "other": "Something else",
+      "harassment": "Harassment",
+      "misleading_information": "Misleading information",
+      "spam": "Spam"
+    },
+    "enquiryTitle": "Report this enquiry",
+    "userTitle": "Report this buyer",
+    "privacy": "The person you report won't see your name, your contact details or what you wrote.",
+    "evidence": "Evidence (optional)",
+    "evidenceHint": "Up to 3 photos or PDFs, 5 MB each. Only administrators can see them.",
+    "evidenceTooMany": "You can attach up to 3 files.",
+    "evidenceBad": "{name} must be a JPEG, PNG, WebP or PDF of 5 MB or less.",
+    "uploading": "Uploading evidence…",
+    "errors": {
+      "duplicate": "You've already reported this and it's still being reviewed. You can follow it under My reports.",
+      "rate_limited": "You've sent several reports recently. Please try again tomorrow, or contact us if it's urgent.",
+      "not_allowed": "You can't report this.",
+      "restricted": "Sending reports is turned off for your account.",
+      "evidence_invalid": "One of the files couldn't be accepted. Remove it and try again.",
+      "not_found": "This no longer exists."
     }
   },
   "reportStatus": {
-    "open": "Open",
+    "open": "Pending",
     "reviewing": "Under review",
     "resolved": "Resolved",
-    "dismissed": "Closed"
+    "dismissed": "Dismissed",
+    "awaiting_info": "Awaiting information"
   },
   "account": {
     "nav": {
@@ -633,7 +653,8 @@
       "enquiries": "My enquiries",
       "invoices": "Invoices & payments",
       "reports": "My reports",
-      "settings": "Settings"
+      "settings": "Settings",
+      "notices": "Account notices"
     },
     "overview": {
       "title": "My account",
@@ -742,7 +763,8 @@
       "reports": "Reports",
       "reference": "Locations & categories",
       "settings": "Settings",
-      "logs": "Audit log"
+      "logs": "Audit log",
+      "appeals": "Appeals"
     },
     "common": {
       "search": "Search",
@@ -784,7 +806,9 @@
       "already_exists": "That already exists.",
       "in_use": "This is still used by farms, listings or other records. Deactivate it instead.",
       "limit_reached": "The limit has been reached. Remove one first.",
-      "failed": "Something went wrong. Nothing was changed. Please try again."
+      "failed": "Something went wrong. Nothing was changed. Please try again.",
+      "hold_not_allowed": "Pausing appeals isn't allowed by the current policy (Settings).",
+      "no_reported_user": "This report isn't linked to an account, so no account action can be taken."
     },
     "dashboard": {
       "title": "Dashboard",
@@ -1066,7 +1090,8 @@
       "targetTypes": {
         "product": "Listing",
         "farmer": "Farm",
-        "user": "Account"
+        "user": "Account",
+        "enquiry": "Enquiry"
       },
       "reporter": "From",
       "target": "About",
@@ -1086,7 +1111,61 @@
         "resolved": "Report resolved.",
         "dismissed": "Report dismissed.",
         "open": "Report reopened."
-      }
+      },
+      "assignee": "Assigned to",
+      "unassigned": "Unassigned",
+      "assignedToMe": "Assigned to me",
+      "anyone": "Anyone",
+      "open": "Open report",
+      "internalRecord": "Internal record",
+      "reporterRoles": {
+        "consumer": "Buyer",
+        "farmer": "Farmer",
+        "admin": "Administrator"
+      },
+      "back": "Back to reports",
+      "subject": "Reported account",
+      "listing": "Listing",
+      "enquiry": "Enquiry",
+      "evidence": "Evidence",
+      "evidenceFile": "File {n}",
+      "noEvidence": "No files attached.",
+      "assign": "Assign",
+      "assignMe": "Assign to me",
+      "assignTo": "Assign to",
+      "assignHint": "Choose an administrator.",
+      "assigned": "Report assigned.",
+      "messages": "Messages with the reporter",
+      "noMessages": "No messages yet.",
+      "fromReporter": "Reporter",
+      "fromAdmin": "Administrator",
+      "requestInfo": "Ask the reporter for more information",
+      "requestInfoLabel": "Question for the reporter",
+      "requestInfoBody": "The reporter sees this question in My reports. The report waits for their reply.",
+      "infoRequested": "Question sent.",
+      "notes": "Internal notes",
+      "notesHint": "Only administrators can see these notes — never the reporter or the reported person.",
+      "noNotes": "No notes yet.",
+      "addNote": "Add note",
+      "noteLabel": "Note",
+      "noteAdded": "Note added.",
+      "decision": "Decision",
+      "decide": "Record decision and close",
+      "decisionBody": "Choose what happens. Account actions are applied to the reported account and recorded in its enforcement history.",
+      "outcome": "Outcome",
+      "outcomes": {
+        "no_action": "No action needed",
+        "warning": "Warn the account",
+        "restriction": "Restrict features",
+        "suspension": "Suspend the account",
+        "block": "Block the account",
+        "listing_removed": "Remove the listing"
+      },
+      "close": "Close as",
+      "userReason": "Reason shown to the reported account",
+      "userReasonHint": "Don't mention who reported them or what the reporter wrote.",
+      "decided": "Decision recorded and report closed.",
+      "dismissInstead": "Dismiss (not a valid report)"
     },
     "reference": {
       "title": "Locations & categories",
@@ -1154,7 +1233,19 @@
         "settings_manage": "Change platform settings",
         "payments_verify": "Verify recorded payments",
         "logs_view": "Read the audit log"
-      }
+      },
+      "appeals": "Appeals",
+      "appealsHelp": "Whether users can appeal warnings, restrictions, suspensions and blocks from their account notices.",
+      "appealsOn": "On — users can appeal",
+      "appealsOff": "Off — appeals are closed",
+      "appealsConfirmOn": "Open appeals? Users can appeal enforcement actions again.",
+      "appealsConfirmOff": "Close appeals? Users can't submit new appeals until you open them again. Pending appeals stay in the queue.",
+      "hold": "Pausing appeals during investigations",
+      "holdHelp": "When allowed, an administrator can pause the appeal on a specific action while an investigation is under way, with a justification the user can see.",
+      "holdOn": "Allowed",
+      "holdOff": "Not allowed",
+      "holdConfirmOn": "Allow administrators to pause appeals during investigations?",
+      "holdConfirmOff": "Stop allowing paused appeals? Actions already paused stay paused until decided."
     },
     "logs": {
       "title": "Audit log",
@@ -1164,6 +1255,128 @@
       "actor": "By",
       "target": "Target",
       "details": "Details"
+    },
+    "enforcement": {
+      "title": "Enforcement history",
+      "none": "No warnings or restrictions.",
+      "warn": "Warn",
+      "warnBody": "The user sees the warning and its reason in their account notices. Nothing else changes.",
+      "warned": "Warning sent.",
+      "userReason": "Reason shown to the user",
+      "userReasonHint": "Don't mention who reported them.",
+      "internalNote": "Internal note (administrators only)",
+      "holdAppeal": "Pause appeals while this is investigated",
+      "holdReason": "Why appeals are paused (shown to the user)",
+      "types": {
+        "warning": "Warning",
+        "restriction": "Restriction",
+        "suspension": "Suspension",
+        "block": "Block"
+      },
+      "statuses": {
+        "active": "In effect",
+        "expired": "Ended",
+        "lifted": "Lifted",
+        "overturned": "Overturned"
+      },
+      "appealStatuses": {
+        "none": "No appeal",
+        "pending": "Appeal pending",
+        "upheld": "Appeal upheld",
+        "overturned": "Appeal overturned"
+      },
+      "by": "by {name}",
+      "until": "until {date}",
+      "fromReport": "From a report",
+      "appealHeld": "Appeals paused: {reason}"
+    },
+    "appeals": {
+      "title": "Appeals",
+      "intro": "Appeals waiting for a decision. Overturning lifts the action; upholding keeps it.",
+      "empty": "No appeals waiting.",
+      "account": "Account",
+      "action": "Decision appealed",
+      "appealMessage": "Appeal",
+      "submitted": "Sent {date}",
+      "uphold": "Uphold",
+      "upholdBody": "Keep the decision. The user sees your note.",
+      "overturn": "Overturn and lift",
+      "overturnBody": "Lift the action (restore the account or remove the restriction). The user sees your note.",
+      "outcomeLabel": "Note to the user",
+      "upheld": "Appeal upheld.",
+      "overturned": "Appeal overturned and the action lifted."
+    },
+    "records": {
+      "create": "Create moderation record",
+      "createBody": "Open an internal report about this account (for things you noticed yourself). It goes into the reports queue.",
+      "reasonLabel": "Category",
+      "detailsLabel": "What happened",
+      "created": "Moderation record created."
     }
+  },
+  "accountReports": {
+    "messages": "Messages",
+    "fromAdmin": "FarmConnect",
+    "fromYou": "You",
+    "awaitingHint": "We need more information from you before we can continue.",
+    "replyLabel": "Your reply",
+    "reply": "Send reply",
+    "replySent": "Reply sent.",
+    "replyFailed": "Couldn't send your reply. Please try again.",
+    "evidenceCount": "{count} files attached"
+  },
+  "notices": {
+    "nav": "Account notices",
+    "title": "Account notices",
+    "intro": "Warnings and restrictions on your account, and your appeals.",
+    "empty": "Nothing here",
+    "emptyBody": "Your account is in good standing.",
+    "banner": "There's a notice about your account.",
+    "bannerLink": "View account notices",
+    "types": {
+      "warning": "Warning",
+      "restriction": "Some features turned off",
+      "suspension": "Account suspended",
+      "block": "Account blocked"
+    },
+    "statuses": {
+      "active": "In effect",
+      "expired": "Ended",
+      "lifted": "Lifted",
+      "overturned": "Overturned on appeal"
+    },
+    "issued": "Issued {date}",
+    "until": "Until {date}",
+    "reason": "Reason",
+    "turnedOff": "Turned off: {list}",
+    "appeal": "Appeal",
+    "appealIntro": "If you think this was a mistake, explain why. An administrator will review your appeal and reply here.",
+    "appealLabel": "Your appeal",
+    "appealHint": "At least 20 characters.",
+    "submitAppeal": "Send appeal",
+    "appealSent": "Appeal sent. You'll see the outcome here.",
+    "appealPending": "Appeal under review (sent {date}).",
+    "appealUpheld": "Your appeal was reviewed and the decision stands.",
+    "appealOverturned": "Your appeal was accepted and the action was lifted.",
+    "outcomeNote": "Administrator's note: {note}",
+    "appealHeld": "Appeals on this decision are paused while an investigation is under way. Reason: {reason}",
+    "appealsDisabled": "Appeals aren't open at the moment. Contact us if you need help.",
+    "appealFailed": "Couldn't send your appeal. Please try again.",
+    "appealErrors": {
+      "already_appealed": "You've already appealed this decision.",
+      "not_appealable": "This decision can no longer be appealed.",
+      "appeal_held": "Appeals on this decision are paused while an investigation is under way.",
+      "appeals_disabled": "Appeals aren't open at the moment.",
+      "not_found": "This notice no longer exists."
+    }
+  },
+  "appealPage": {
+    "title": "Your account",
+    "intro": "Your account can't be used at the moment. Here's why, and how to appeal.",
+    "signIn": "Sign in to see your account notices and appeal.",
+    "loading": "Loading your notices…",
+    "failed": "Couldn't load your notices. Please try again.",
+    "signOut": "Sign out",
+    "contact": "Contact us"
   }
 }

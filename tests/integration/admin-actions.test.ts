@@ -125,7 +125,7 @@ describe("admin Server Actions", () => {
       ok: false,
       error: "invalid_input",
     });
-    expect(await blockUserAction(target.uid, "Confirmed fraud")).toEqual({
+    expect(await blockUserAction(target.uid, "Confirmed fraud")).toMatchObject({
       ok: true,
     });
     expect(await restoreUserAction(target.uid, "Appeal")).toEqual({ ok: true });

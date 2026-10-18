@@ -4,7 +4,8 @@ import { fill } from "@shared/i18n/format";
 import { formatDate } from "@shared/utils/date";
 import { getDictionary, getLocale } from "@/i18n/server";
 import { requireFarmerPortal } from "@/lib/auth/portal-access";
-import { getFarmerProfile } from "@/services/server/accounts";
+import { getFarmerProfile, getUserAccount } from "@/services/server/accounts";
+import { ReportForm } from "@/features/consumer/components/report-form";
 import { listFarmerEnquiries } from "@/services/server/farmer";
 import { EnquiryActions } from "@/features/farmer/components/enquiry-actions";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -20,12 +21,14 @@ const STATUS_TONE = {
 
 export default async function FarmerEnquiriesPage() {
   const user = await requireFarmerPortal();
-  const [locale, dict, enquiries, farm] = await Promise.all([
+  const [locale, dict, enquiries, farm, account] = await Promise.all([
     getLocale(),
     getDictionary(),
     listFarmerEnquiries(user.uid),
     getFarmerProfile(user.uid),
+    getUserAccount(user.uid),
   ]);
+  const canReport = !account?.restrictions?.includes("reports");
   const t = dict.farmerPortal.enquiries;
   const farmName = farm ? pickLocalized(farm.farmName, locale) : "";
 
@@ -87,6 +90,14 @@ export default async function FarmerEnquiriesPage() {
                   productTitle={productTitle}
                   dict={dict}
                 />
+                {canReport ? (
+                  <ReportForm
+                    targetType="enquiry"
+                    targetId={e.id}
+                    dict={dict}
+                    locale={locale}
+                  />
+                ) : null}
               </li>
             );
           })}

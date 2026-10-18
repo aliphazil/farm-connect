@@ -8,6 +8,7 @@ import {
 } from "@firebase/rules-unit-testing";
 import { doc, setDoc } from "firebase/firestore";
 import {
+  deleteObject,
   getBytes,
   ref,
   uploadBytes,
@@ -187,6 +188,57 @@ describeIfStorage("storage rules", () => {
     it("is read-only for every client, including admins", async () => {
       await assertFails(
         put(asAdmin(), "branding/logo.png", KB, { contentType: "image/png" }),
+      );
+    });
+  });
+
+  describe("report evidence", () => {
+    const pdf = { contentType: "application/pdf" };
+    it("can be uploaded by active members into their own folder only", async () => {
+      await assertSucceeds(
+        put(asConsumer(), "reportEvidence/consumerC/receipt.pdf", KB, pdf),
+      );
+      await assertSucceeds(put(asFarmerA(), "reportEvidence/farmerA/chat.jpg"));
+      await assertFails(put(asConsumer(), "reportEvidence/farmerA/fake.jpg"));
+      await assertFails(put(asBlocked(), "reportEvidence/blockedD/x.jpg"));
+      await assertFails(put(asAnon(), "reportEvidence/anon/x.jpg"));
+    });
+
+    it("must be a small image or PDF with a safe name", async () => {
+      await assertFails(
+        put(asConsumer(), "reportEvidence/consumerC/page.html", KB, {
+          contentType: "text/html",
+        }),
+      );
+      await assertFails(
+        put(asConsumer(), "reportEvidence/consumerC/big.jpg", 6 * KB * KB),
+      );
+      await assertFails(
+        put(asConsumer(), "reportEvidence/consumerC/bad name.jpg"),
+      );
+    });
+
+    it("is private to the reporter and admins, and can't be replaced or deleted", async () => {
+      await assertSucceeds(
+        put(asConsumer(), "reportEvidence/consumerC/proof.jpg"),
+      );
+      await assertSucceeds(
+        getBytes(ref(asConsumer(), "reportEvidence/consumerC/proof.jpg")),
+      );
+      await assertSucceeds(
+        getBytes(ref(asAdmin(), "reportEvidence/consumerC/proof.jpg")),
+      );
+      await assertFails(
+        getBytes(ref(asFarmerA(), "reportEvidence/consumerC/proof.jpg")),
+      );
+      await assertFails(
+        getBytes(ref(asAnon(), "reportEvidence/consumerC/proof.jpg")),
+      );
+      await assertFails(
+        put(asConsumer(), "reportEvidence/consumerC/proof.jpg"),
+      );
+      await assertFails(
+        deleteObject(ref(asConsumer(), "reportEvidence/consumerC/proof.jpg")),
       );
     });
   });

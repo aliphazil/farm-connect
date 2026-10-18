@@ -11,7 +11,12 @@ import type { FraudReport } from "@shared/schemas";
 import { getDictionary, getLocale } from "@/i18n/server";
 import { localeHref } from "@/i18n/paths";
 import { requireAdminPortal } from "@/lib/auth/portal-access";
-import { getUserDetail } from "@/services/server/admin-queries";
+import {
+  getModerationSettings,
+  getUserDetail,
+  listEnforcementFor,
+} from "@/services/server/admin-queries";
+import { AccountModerationTools } from "@/features/admin/components/enforcement-actions";
 import { getIslandMap, toPlace } from "@/services/server/farmer";
 import { UserActions } from "@/features/admin/components/user-actions";
 import { HistoryList, StatusBadge } from "@/components/admin/admin-ui";
@@ -32,12 +37,16 @@ export default async function AdminUserPage({
 }: PageProps<"/[locale]/admin/users/[uid]">) {
   const admin = await requireAdminPortal();
   const { uid } = await params;
-  const [locale, dict, detail, islands] = await Promise.all([
-    getLocale(),
-    getDictionary(),
-    getUserDetail(decodeURIComponent(uid)),
-    getIslandMap(),
-  ]);
+  const userId = decodeURIComponent(uid);
+  const [locale, dict, detail, islands, enforcement, settings] =
+    await Promise.all([
+      getLocale(),
+      getDictionary(),
+      getUserDetail(userId),
+      getIslandMap(),
+      listEnforcementFor(userId),
+      getModerationSettings(),
+    ]);
   if (!detail) notFound();
 
   const t = dict.admin;
@@ -265,6 +274,93 @@ export default async function AdminUserPage({
             </h2>
             {reportList(detail.reportsBy)}
           </section>
+          <section
+            aria-labelledby="enforcement"
+            className="flex flex-col gap-2"
+          >
+            <h2 id="enforcement" className="font-semibold">
+              {t.enforcement.title}
+            </h2>
+            {enforcement.length ? (
+              <ul className="flex flex-col gap-2">
+                {enforcement.map((a) => (
+                  <li
+                    key={a.id}
+                    className="rounded-lg border border-border p-3 text-sm"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium">
+                        {t.enforcement.types[a.type]}
+                      </span>
+                      <Badge
+                        tone={a.status === "active" ? "danger" : "neutral"}
+                      >
+                        {t.enforcement.statuses[a.status]}
+                      </Badge>
+                      {a.appeal.status !== "none" ? (
+                        <Badge
+                          tone={
+                            a.appeal.status === "pending"
+                              ? "warning"
+                              : "neutral"
+                          }
+                        >
+                          {t.enforcement.appealStatuses[a.appeal.status]}
+                        </Badge>
+                      ) : null}
+                      {a.reportId ? (
+                        <Link
+                          href={localeHref(
+                            locale,
+                            `/admin/reports/${a.reportId}`,
+                          )}
+                          className="text-primary hover:underline"
+                        >
+                          {t.enforcement.fromReport}
+                        </Link>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 text-muted">
+                      {formatDateTime(a.createdAt, locale)} ·{" "}
+                      {fill(t.enforcement.by, { name: a.createdByName })}
+                      {a.expiresAt
+                        ? ` · ${fill(t.enforcement.until, { date: formatDateTime(a.expiresAt, locale) })}`
+                        : ""}
+                    </p>
+                    <p className="mt-1">{a.reason}</p>
+                    {a.restrictions?.length ? (
+                      <p className="text-muted">
+                        {a.restrictions
+                          .map((r) => d.restrictionLabels[r])
+                          .join(", ")}
+                      </p>
+                    ) : null}
+                    {a.internalNote ? (
+                      <p className="mt-1 text-muted italic">{a.internalNote}</p>
+                    ) : null}
+                    {a.appeal.heldUntilDecision ? (
+                      <p className="text-muted">
+                        {fill(t.enforcement.appealHeld, {
+                          reason: a.appeal.heldReason ?? "",
+                        })}
+                      </p>
+                    ) : null}
+                    {a.appeal.message ? (
+                      <p className="mt-1 rounded bg-background p-2 whitespace-pre-line">
+                        {t.appeals.appealMessage}: {a.appeal.message}
+                      </p>
+                    ) : null}
+                    {a.appeal.outcomeNote ? (
+                      <p className="mt-1 text-muted">{a.appeal.outcomeNote}</p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted">{t.enforcement.none}</p>
+            )}
+          </section>
+
           <section aria-labelledby="history" className="flex flex-col gap-2">
             <h2 id="history" className="font-semibold">
               {d.history}
@@ -294,9 +390,22 @@ export default async function AdminUserPage({
                 approval={farm?.approvalStatus}
                 restrictions={user.restrictions ?? []}
                 permissions={permissions}
+                allowAppealHold={settings.allowAppealHold}
                 t={t}
               />
             )}
+            {user.role !== "admin" && user.uid !== admin.uid ? (
+              <div className="mt-4 border-t border-border pt-4">
+                <AccountModerationTools
+                  uid={user.uid}
+                  canWarn={permissions.includes("users.moderate")}
+                  canRecord={permissions.includes("reports.manage")}
+                  allowAppealHold={settings.allowAppealHold}
+                  reasons={dict.report.reasons}
+                  t={t}
+                />
+              </div>
+            ) : null}
           </Card>
         </aside>
       </div>

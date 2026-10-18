@@ -58,8 +58,13 @@ export async function signIn(
   try {
     return await establishSession(user);
   } catch (error) {
-    // Keep browser and server state consistent if the session can't be created.
-    await firebaseSignOut(getClientAuth());
+    // A blocked or suspended account gets no session, but stays signed in to
+    // Firebase in this browser so it can read the reason and appeal
+    // (/appeal, which uses an ID token). Otherwise keep browser and server
+    // state consistent by signing out.
+    const code = (error as { code?: string }).code;
+    if (code !== "account_blocked" && code !== "account_suspended")
+      await firebaseSignOut(getClientAuth());
     throw error;
   }
 }

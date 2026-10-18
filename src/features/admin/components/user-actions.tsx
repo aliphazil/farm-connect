@@ -20,6 +20,7 @@ import {
   suspendUserAction,
 } from "../actions";
 import { ActionPanel, ConfirmAction } from "./confirm-action";
+import { EnforcementExtras, extrasFrom } from "./enforcement-actions";
 
 const reasonOf = (form: FormData) => String(form.get("reason") ?? "").trim();
 
@@ -34,6 +35,7 @@ export function UserActions({
   approval,
   restrictions,
   permissions,
+  allowAppealHold = false,
   t,
 }: {
   uid: string;
@@ -42,6 +44,7 @@ export function UserActions({
   approval?: FarmerApprovalStatus;
   restrictions: string[];
   permissions: readonly AdminPermission[];
+  allowAppealHold?: boolean;
   t: Dictionary["admin"];
 }) {
   const can = (p: AdminPermission) => permissions.includes(p);
@@ -97,19 +100,31 @@ export function UserActions({
             body={a.suspendConfirm}
             reason="required"
             fields={
-              <SelectField
-                id={`suspend-days-${uid}`}
-                name="days"
-                label={a.days}
-                defaultValue="7"
-                options={SUSPENSION_DAYS.map((n) => ({
-                  value: String(n),
-                  label: days(n),
-                }))}
-              />
+              <>
+                <SelectField
+                  id={`suspend-days-${uid}`}
+                  name="days"
+                  label={a.days}
+                  defaultValue="7"
+                  options={SUSPENSION_DAYS.map((n) => ({
+                    value: String(n),
+                    label: days(n),
+                  }))}
+                />
+                <EnforcementExtras
+                  id={`suspend-${uid}`}
+                  allowAppealHold={allowAppealHold}
+                  t={t}
+                />
+              </>
             }
             onConfirm={(f) =>
-              suspendUserAction(uid, Number(f.get("days")), reasonOf(f))
+              suspendUserAction(
+                uid,
+                Number(f.get("days")),
+                reasonOf(f),
+                extrasFrom(f),
+              )
             }
             success={a.done.suspended}
           />
@@ -122,7 +137,14 @@ export function UserActions({
             title={a.block}
             body={a.blockConfirm}
             reason="required"
-            onConfirm={(f) => blockUserAction(uid, reasonOf(f))}
+            fields={
+              <EnforcementExtras
+                id={`block-${uid}`}
+                allowAppealHold={allowAppealHold}
+                t={t}
+              />
+            }
+            onConfirm={(f) => blockUserAction(uid, reasonOf(f), extrasFrom(f))}
             success={a.done.blocked}
           />
         ) : null}
@@ -164,6 +186,11 @@ export function UserActions({
                   {t.userDetail.restrictionLabels[r]}
                 </label>
               ))}
+              <EnforcementExtras
+                id={`restrict-${uid}`}
+                allowAppealHold={allowAppealHold}
+                t={t}
+              />
             </fieldset>
           }
           onConfirm={(f) =>
@@ -171,6 +198,7 @@ export function UserActions({
               uid,
               f.getAll("restrictions").map(String) as AccountRestriction[],
               reasonOf(f),
+              extrasFrom(f),
             )
           }
           success={a.done.restricted}

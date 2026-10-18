@@ -20,6 +20,7 @@ export default async function ConsumerLayout({
         { href: href("/account/enquiries"), label: t.enquiries },
         { href: href("/account/invoices"), label: t.invoices },
         { href: href("/account/reports"), label: t.reports },
+        { href: href("/account/notices"), label: t.notices },
         { href: href("/account/settings"), label: t.settings },
       ]}
     >

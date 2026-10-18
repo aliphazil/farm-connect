@@ -6,6 +6,7 @@ export * from "./product";
 export * from "./reference";
 export * from "./enquiry";
 export * from "./report";
+export * from "./enforcement";
 export * from "./order";
 export * from "./invoice";
 export * from "./payment";

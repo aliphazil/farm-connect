@@ -493,18 +493,21 @@ describe("privilege boundaries", () => {
     });
   });
 
-  it("a suspended farmer can't keep writing, uploading or sign in again", async () => {
+  it("a blocked farmer can't keep writing or uploading, even after signing in again", async () => {
     await signInAs(farmerA.email); // token issued before the block
     await blockUser(admin, farmerA.uid, "Suspended for testing");
     await expect(createProduct(newProductId(), input)).rejects.toThrow();
     await expect(uploadFarmLogo(JPEG)).rejects.toThrow();
     await expect(updateMyFarmerProfile({ address: "x" })).rejects.toThrow();
+    // Firebase sign-in still works (so they can read the reason and appeal),
+    // but the new token carries the blocked claim and every write is refused.
     await signOut(getClientAuth());
-    await expect(
-      signInWithEmailAndPassword(getClientAuth(), farmerA.email, PASSWORD),
-    ).rejects.toMatchObject({
-      code: "auth/user-disabled",
-    });
+    await signInWithEmailAndPassword(getClientAuth(), farmerA.email, PASSWORD);
+    const token = await getClientAuth().currentUser!.getIdTokenResult(true);
+    expect(token.claims.blocked).toBe(true);
+    await expect(createProduct(newProductId(), input)).rejects.toThrow();
+    await expect(uploadFarmLogo(JPEG)).rejects.toThrow();
+    await signOut(getClientAuth());
     const snap = await getDoc(
       doc(getClientDb(), COLLECTIONS.farmerProfiles, farmerA.uid),
     ).catch(() => null);

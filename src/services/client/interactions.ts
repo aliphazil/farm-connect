@@ -14,7 +14,6 @@ import type { Locale } from "@shared/constants/locales";
 import {
   buildEnquiryCreate,
   buildFavourite,
-  buildReportCreate,
   buildSiteEvent,
 } from "@shared/payloads";
 import {
@@ -25,7 +24,6 @@ import {
   type EnquiryStatus,
   type FavouriteTarget,
   type ContactChannel,
-  type FraudReportInput,
   type SiteEventType,
 } from "@shared/schemas";
 import { getClientAuth } from "@/lib/firebase/client";
@@ -116,13 +114,8 @@ export async function listMyEnquiries(as: "farmer" | "consumer") {
 }
 
 // ---------- reports ----------
-export async function submitReport(input: FraudReportInput): Promise<string> {
-  const ref = await addDoc(
-    colRef(COLLECTIONS.reports),
-    buildReportCreate(input, await requireUid(), now()),
-  );
-  return ref.id;
-}
+// Reports are submitted through the server (src/features/reports/actions.ts),
+// which validates the target, prevents duplicates and rate-limits.
 
 // ---------- usage events ----------
 /** Fire-and-forget; analytics must never break the page. */

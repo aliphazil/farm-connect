@@ -3,7 +3,10 @@ import { fill } from "@shared/i18n/format";
 import { getDictionary } from "@/i18n/server";
 import { requireAdminPermission } from "@/lib/auth/portal-access";
 import { getModerationSettings } from "@/services/server/admin-queries";
-import { ApprovalToggle } from "@/features/admin/components/settings-actions";
+import {
+  AppealSettingToggle,
+  ApprovalToggle,
+} from "@/features/admin/components/settings-actions";
 import { Badge, Card, PageHeader } from "@/components/ui/layout-primitives";
 
 export default async function AdminSettingsPage() {
@@ -29,6 +32,35 @@ export default async function AdminSettingsPage() {
         </p>
         {allowed ? (
           <ApprovalToggle enabled={settings.listingsRequireApproval} t={t} />
+        ) : (
+          <p className="text-sm text-muted">{t.common.ownerOnly}</p>
+        )}
+      </Card>
+
+      <Card className="flex flex-col gap-3">
+        <h2 className="font-semibold">{s.appeals}</h2>
+        <p className="text-sm text-muted">{s.appealsHelp}</p>
+        <p className="font-medium">
+          {settings.appealsEnabled ? s.appealsOn : s.appealsOff}
+        </p>
+        {allowed ? (
+          <AppealSettingToggle
+            setting="appealsEnabled"
+            enabled={settings.appealsEnabled}
+            t={t}
+          />
+        ) : null}
+        <h3 className="mt-2 font-semibold">{s.hold}</h3>
+        <p className="text-sm text-muted">{s.holdHelp}</p>
+        <p className="font-medium">
+          {settings.allowAppealHold ? s.holdOn : s.holdOff}
+        </p>
+        {allowed ? (
+          <AppealSettingToggle
+            setting="allowAppealHold"
+            enabled={settings.allowAppealHold}
+            t={t}
+          />
         ) : (
           <p className="text-sm text-muted">{t.common.ownerOnly}</p>
         )}
