@@ -158,7 +158,9 @@ export function ProductDetailView({
         {listing.description ? (
           <div>
             <h2 className="font-semibold">{dict.products.description}</h2>
-            <p className="mt-1 whitespace-pre-line text-muted">
+            {/* Farmer-written text may be in either language: let the
+                browser choose its direction. */}
+            <p dir="auto" className="mt-1 whitespace-pre-line text-muted">
               {pickLocalized(listing.description, locale)}
             </p>
           </div>

@@ -48,7 +48,7 @@ export function FarmerCard({
           {placeText(farmer.place, locale)}
         </p>
         {farmer.bio ? (
-          <p className="line-clamp-2 text-sm text-muted">
+          <p dir="auto" className="line-clamp-2 text-sm text-muted">
             {pickLocalized(farmer.bio, locale)}
           </p>
         ) : null}

@@ -24,7 +24,7 @@ import type {
 } from "@/features/catalog/types";
 import { getAdminDb } from "@/lib/firebase/admin";
 import { getFarmerTotals } from "./analytics";
-import { snapToModel } from "./db";
+import { col, isDocId, snapToModel } from "./db";
 
 /**
  * Read services for the farmer portal (Admin SDK, server only).
@@ -111,9 +111,10 @@ export async function getFarmerProduct(
   uid: string,
   productId: string,
 ): Promise<Product | null> {
+  if (!isDocId(productId)) return null;
   const product = snapToModel(
     productSchema,
-    await db().collection(COLLECTIONS.products).doc(productId).get(),
+    await col(COLLECTIONS.products).doc(productId).get(),
   );
   return product && product.farmerId === uid ? product : null;
 }

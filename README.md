@@ -16,7 +16,8 @@ npm run dev                  # http://localhost:3000
 
 Without Firebase configuration the site runs with sample catalog data (`CATALOG_SOURCE=sample`; set `firestore` for live data) and sign-in reports that it isn't
 available yet. To connect Firebase (console steps, rules deployment, first admin, hosting) follow
-**[docs/firebase-setup.md](docs/firebase-setup.md)**.
+**[docs/firebase-setup.md](docs/firebase-setup.md)**. Launch, backups and rollback:
+**[docs/deployment.md](docs/deployment.md)**.
 
 | Script                       | What it does                                                                      |
 | ---------------------------- | --------------------------------------------------------------------------------- |
@@ -56,7 +57,7 @@ src/
 firebase/                firestore.rules, storage.rules, firestore.indexes.json
 scripts/                 seed-reference-data.mts, grant-admin.mts
 tests/                   emulator tests: rules/ and integration/
-docs/                    firebase-setup.md, data-model.md, security.md
+docs/                    deployment.md, firebase-setup.md, data-model.md, security.md
 ```
 
 ## Security model (summary — details in [docs/security.md](docs/security.md))

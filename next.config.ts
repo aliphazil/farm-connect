@@ -6,7 +6,20 @@ const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=()",
+    // Self only: the farm profile's "use my current location" button.
+    value: "camera=(), microphone=(), geolocation=(self)",
+  },
+  // Browsers only honour this over HTTPS (ignored on http://localhost).
+  {
+    key: "Strict-Transport-Security",
+    value: "max-age=31536000; includeSubDomains",
+  },
+  // Restrictions that don't need per-request script nonces. A full script
+  // CSP is a follow-up (see docs/security.md).
+  {
+    key: "Content-Security-Policy",
+    value:
+      "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'",
   },
 ];
 

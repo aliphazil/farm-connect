@@ -42,7 +42,7 @@ import {
 } from "@shared/schemas";
 import { getAdminAuth, getAdminDb } from "@/lib/firebase/admin";
 import { getTrafficTotals } from "./analytics";
-import { BOOTSTRAP_ACTOR, col, snapToModel } from "./db";
+import { BOOTSTRAP_ACTOR, col, isDocId, snapToModel } from "./db";
 
 /**
  * Read models for the admin portal (Admin SDK, server only). Callers must
@@ -509,6 +509,7 @@ async function reportsWhere(field: string, value: string) {
 export async function getUserDetail(
   uid: string,
 ): Promise<AdminUserDetail | null> {
+  if (!isDocId(uid)) return null;
   const user = parseUser(await col(COLLECTIONS.users).doc(uid).get());
   if (!user) return null;
   const [
@@ -673,6 +674,7 @@ export type AdminProductDetail = {
 export async function getProductDetail(
   id: string,
 ): Promise<AdminProductDetail | null> {
+  if (!isDocId(id)) return null;
   const product = parseProduct(await col(COLLECTIONS.products).doc(id).get());
   if (!product) return null;
   const [[row], userSnap, reports, history] = await Promise.all([
@@ -929,6 +931,7 @@ export type AdminReportDetail = {
 export async function getReportDetail(
   id: string,
 ): Promise<AdminReportDetail | null> {
+  if (!isDocId(id)) return null;
   const ref = col(COLLECTIONS.reports).doc(id);
   const snap = await ref.get();
   const r = tryParse(() => snapToModel(fraudReportSchema, snap));

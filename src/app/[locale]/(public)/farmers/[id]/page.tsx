@@ -109,7 +109,7 @@ export default async function FarmerProfilePage({
             {farmer.bio ? (
               <div className="mt-6">
                 <h2 className="font-semibold">{dict.farmers.about}</h2>
-                <p className="mt-1 max-w-2xl text-muted">
+                <p dir="auto" className="mt-1 max-w-2xl text-muted">
                   {pickLocalized(farmer.bio, locale)}
                 </p>
               </div>

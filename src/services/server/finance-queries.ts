@@ -14,7 +14,7 @@ import {
 } from "@shared/schemas";
 import { adminCan, adminLevelOf } from "@shared/constants/admin";
 import { getAdminDb } from "@/lib/firebase/admin";
-import { col, snapToModel } from "./db";
+import { col, isDocId, snapToModel } from "./db";
 import { logFinanceView } from "./admin";
 
 /**
@@ -126,6 +126,7 @@ export async function getFarmerOrder(
   uid: string,
   orderId: string,
 ): Promise<FarmerOrderDetail | null> {
+  if (!isDocId(orderId)) return null;
   const snap = await col(COLLECTIONS.orders).doc(orderId).get();
   const order = parse(() => snapToModel(orderSchema, snap));
   if (!order || order.farmerId !== uid) return null;
@@ -146,6 +147,7 @@ export async function getFarmerOrder(
 
 /** The farmer's accepted enquiries (to start a transaction from). */
 export async function getEnquiryForSale(uid: string, enquiryId: string) {
+  if (!isDocId(enquiryId)) return null;
   const e = await col(COLLECTIONS.enquiries).doc(enquiryId).get();
   if (!e.exists || e.get("farmerId") !== uid) return null;
   const product = await col(COLLECTIONS.products).doc(e.get("productId")).get();
@@ -179,6 +181,7 @@ export async function getInvoiceDocument(
   invoiceId: string,
   viewer: Viewer,
 ): Promise<InvoiceDocument | null> {
+  if (!isDocId(invoiceId)) return null;
   const snap = await col(COLLECTIONS.invoices).doc(invoiceId).get();
   const invoice = parse(() => snapToModel(invoiceSchema, snap));
   if (!invoice) return null;
@@ -207,6 +210,7 @@ export async function getReceiptDocument(
   receiptId: string,
   viewer: Viewer,
 ): Promise<ReceiptDocument | null> {
+  if (!isDocId(receiptId)) return null;
   const snap = await col(COLLECTIONS.receipts).doc(receiptId).get();
   const receipt = parse(() => snapToModel(receiptSchema, snap));
   if (!receipt) return null;

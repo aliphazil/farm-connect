@@ -19,8 +19,43 @@ import { getAdminDb } from "@/lib/firebase/admin";
 
 export const serverNow = () => FieldValue.serverTimestamp();
 
+/** Thrown when a request supplies something that can't be a document id. */
+export class InvalidIdError extends Error {
+  constructor() {
+    super("invalid_id");
+    this.name = "InvalidIdError";
+  }
+}
+
+/**
+ * A single Firestore document id. Ids from requests must never contain "/",
+ * which Firestore would read as a path into another (sub)collection.
+ */
+export function isDocId(id: unknown): id is string {
+  return (
+    typeof id === "string" &&
+    id.length > 0 &&
+    id.length <= 256 &&
+    !id.includes("/") &&
+    id !== "." &&
+    id !== ".." &&
+    !/^__.*__$/.test(id)
+  );
+}
+
+/**
+ * A collection whose `.doc(id)` only accepts a single document id, so a
+ * request-supplied id can't reach a different path.
+ */
 export function col(name: CollectionName) {
-  return getAdminDb().collection(name);
+  const ref = getAdminDb().collection(name);
+  const doc = ref.doc.bind(ref);
+  ref.doc = ((id?: string) => {
+    if (id === undefined) return doc();
+    if (!isDocId(id)) throw new InvalidIdError();
+    return doc(id);
+  }) as typeof ref.doc;
+  return ref;
 }
 
 export function snapToModel<S extends z.ZodType>(

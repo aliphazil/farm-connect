@@ -198,8 +198,10 @@ service cloud.firestore {
     }
 
     match /farmerProfiles/{userId} {
-      // Public only once approved and not hidden (e.g. owner blocked).
-      allow read: if farmIsPublic(resource.data) || isSelf(userId) || isAdmin();
+      // Owner and admins only. The profile also holds the private address and
+      // map pin, so it is never publicly readable; the public site shows
+      // approved farms through server code that picks the public fields.
+      allow read: if isSelf(userId) || isAdmin();
       allow create, delete: if false;
       // approvalStatus, verified and visible are admin-controlled.
       allow update: if isSelf(userId)

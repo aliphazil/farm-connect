@@ -376,8 +376,14 @@ describe("admin privileges", () => {
 });
 
 describe("farmerProfiles", () => {
-  it("are public only when approved and visible", async () => {
-    await assertSucceeds(getDoc(doc(asAnon(), "farmerProfiles/farmerA")));
+  it("are readable only by their owner and admins", async () => {
+    // Not public even when approved: the profile holds the private address
+    // and map pin. The public site reads approved farms on the server.
+    await assertFails(getDoc(doc(asAnon(), "farmerProfiles/farmerA")));
+    await assertFails(getDoc(doc(asConsumerC(), "farmerProfiles/farmerA")));
+    await assertFails(getDoc(doc(asFarmerB(), "farmerProfiles/farmerA")));
+    await assertFails(getDocs(collection(asAnon(), "farmerProfiles")));
+    await assertSucceeds(getDoc(doc(asFarmerA(), "farmerProfiles/farmerA")));
     await assertFails(getDoc(doc(asAnon(), "farmerProfiles/farmerB")));
     await assertSucceeds(getDoc(doc(asFarmerB(), "farmerProfiles/farmerB")));
     await assertSucceeds(getDoc(doc(asAdmin(), "farmerProfiles/farmerB")));
