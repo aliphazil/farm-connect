@@ -10,12 +10,7 @@ import {
   where,
 } from "firebase/firestore";
 import { COLLECTIONS } from "@shared/firestore-paths";
-import type { Locale } from "@shared/constants/locales";
-import {
-  buildEnquiryCreate,
-  buildFavourite,
-  buildSiteEvent,
-} from "@shared/payloads";
+import { buildEnquiryCreate, buildFavourite } from "@shared/payloads";
 import {
   enquirySchema,
   favouriteSchema,
@@ -23,13 +18,10 @@ import {
   type EnquiryInput,
   type EnquiryStatus,
   type FavouriteTarget,
-  type ContactChannel,
-  type SiteEventType,
 } from "@shared/schemas";
-import { getClientAuth } from "@/lib/firebase/client";
 import { colRef, docRef, now, requireUid, snapToModel } from "./firestore";
 
-/** Consumer-side interactions: favourites, enquiries, reports, usage events. */
+/** Consumer-side interactions: favourites, enquiries, reports. */
 
 // ---------- favourites (products and farms) ----------
 export async function addFavourite(
@@ -116,24 +108,3 @@ export async function listMyEnquiries(as: "farmer" | "consumer") {
 // ---------- reports ----------
 // Reports are submitted through the server (src/features/reports/actions.ts),
 // which validates the target, prevents duplicates and rate-limits.
-
-// ---------- usage events ----------
-/** Fire-and-forget; analytics must never break the page. */
-export function logSiteEvent(event: {
-  type: SiteEventType;
-  locale: Locale;
-  path?: string;
-  productId?: string;
-  farmerId?: string;
-  channel?: ContactChannel;
-}) {
-  try {
-    const uid = getClientAuth().currentUser?.uid;
-    addDoc(
-      colRef(COLLECTIONS.siteEvents),
-      buildSiteEvent(event, uid, now()),
-    ).catch(() => undefined);
-  } catch {
-    // Firebase not configured — ignore.
-  }
-}

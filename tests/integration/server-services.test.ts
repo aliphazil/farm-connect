@@ -10,12 +10,12 @@ import {
   AdminOperationError,
   blockUser,
   changeRole,
-  publishBranding,
   setFarmerApproval,
   setProductModeration,
   unblockUser,
   verifyPayment,
 } from "@/services/server/admin";
+import { saveDraft } from "@/services/server/branding";
 import { LOCATION_AA, PRODUCT_INPUT } from "../support/fixtures";
 
 /**
@@ -197,7 +197,7 @@ describe("admin operations", () => {
       verifyPayment(notAdmin, "x", "verified"),
     ).rejects.toMatchObject({ code: "forbidden" });
     await expect(
-      publishBranding({ uid: "x", role: null }, {} as never),
+      saveDraft({ uid: "x", role: null }, {} as never),
     ).rejects.toMatchObject({ code: "forbidden" });
   });
 
@@ -305,8 +305,24 @@ describe("admin operations", () => {
     );
     expect((await productRef.get()).get("moderation")).toBe("removed");
 
+    // Verification needs a transfer awaiting verification, with evidence.
+    const invoiceRef = db.collection(COLLECTIONS.invoices).doc();
+    await invoiceRef.set({
+      farmerId: "f",
+      totalLaari: 1000,
+      paidLaari: 1000,
+      status: "paid",
+    });
     const paymentRef = db.collection(COLLECTIONS.payments).doc();
-    await paymentRef.set({ farmerId: "f", verificationStatus: "unverified" });
+    await paymentRef.set({
+      farmerId: "f",
+      invoiceId: invoiceRef.id,
+      kind: "payment",
+      amountLaari: 1000,
+      method: "bank_transfer",
+      reference: "BML-1",
+      verificationStatus: "pending_verification",
+    });
     await verifyPayment(admin, paymentRef.id, "verified");
     expect((await paymentRef.get()).data()).toMatchObject({
       verificationStatus: "verified",
@@ -317,23 +333,10 @@ describe("admin operations", () => {
     ).rejects.toBeInstanceOf(AdminOperationError);
 
     await expect(
-      publishBranding(admin, {
-        siteName: { en: "X" },
-        primaryColor: "green",
-        accentColor: "#000000",
+      saveDraft(admin, {
+        identity: { siteName: { en: "X" } },
+        theme: { primary: "green" },
       } as never),
     ).rejects.toMatchObject({ code: "invalid_input" });
-    await publishBranding(admin, {
-      siteName: { en: "FarmConnect" },
-      primaryColor: "#15803d",
-      accentColor: "#0e7490",
-    });
-    const branding = (
-      await db.collection(COLLECTIONS.siteSettings).doc("branding").get()
-    ).data()!;
-    expect(branding).toMatchObject({
-      primaryColor: "#15803d",
-      updatedBy: admin.uid,
-    });
   });
 });

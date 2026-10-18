@@ -14,6 +14,8 @@ export type AdminLevel = (typeof ADMIN_LEVELS)[number];
 export const ADMIN_PERMISSIONS = [
   /** Dashboard, user/product/report lists and details. */
   "admin.view",
+  /** Marketplace analytics (aggregated figures only). */
+  "analytics.view",
   /** Approve or reject farmer registrations. */
   "farmers.approve",
   /** Restrict features, suspend temporarily, lift suspensions. */
@@ -32,6 +34,8 @@ export const ADMIN_PERMISSIONS = [
   "reference.manage",
   /** Platform moderation settings (e.g. listing pre-approval). */
   "settings.manage",
+  /** Branding Studio: look, homepage, footer, languages and SEO. */
+  "branding.manage",
   /** Mark recorded payments verified/rejected. */
   "payments.verify",
   /** Read the admin audit log. */
@@ -41,6 +45,7 @@ export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
 
 const MODERATOR: readonly AdminPermission[] = [
   "admin.view",
+  "analytics.view",
   "farmers.approve",
   "users.moderate",
   "products.moderate",

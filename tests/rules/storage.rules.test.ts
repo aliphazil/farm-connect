@@ -42,6 +42,10 @@ const asConsumer = () =>
   env.authenticatedContext("consumerC", { role: "consumer" }).storage();
 const asAdmin = () =>
   env.authenticatedContext("adminE", { role: "admin" }).storage();
+const asOwnerAdmin = () =>
+  env
+    .authenticatedContext("ownerO", { role: "admin", adminLevel: "owner" })
+    .storage();
 const asAnon = () => env.unauthenticatedContext().storage();
 
 const put = (s: FirebaseStorage, path: string, size = KB, meta = jpeg) =>
@@ -240,6 +244,48 @@ describeIfStorage("storage rules", () => {
       await assertFails(
         deleteObject(ref(asConsumer(), "reportEvidence/consumerC/proof.jpg")),
       );
+    });
+  });
+
+  describe("branding uploads", () => {
+    const png = { contentType: "image/png" };
+    it("only owner-level admins can upload, raster images only, small, write-once, public to read", async () => {
+      await assertSucceeds(
+        put(asOwnerAdmin(), "branding/uploads/logo.png", KB, png),
+      );
+      await assertSucceeds(
+        put(asOwnerAdmin(), "branding/uploads/icon.ico", KB, {
+          contentType: "image/x-icon",
+        }),
+      );
+      await assertFails(put(asAdmin(), "branding/uploads/mod.png", KB, png)); // moderator / no level
+      await assertFails(
+        put(asFarmerA(), "branding/uploads/farmer.png", KB, png),
+      );
+      await assertFails(put(asAnon(), "branding/uploads/anon.png", KB, png));
+      await assertFails(
+        put(asOwnerAdmin(), "branding/uploads/logo.svg", KB, {
+          contentType: "image/svg+xml",
+        }),
+      );
+      await assertFails(
+        put(asOwnerAdmin(), "branding/uploads/page.png", KB, {
+          contentType: "text/html",
+        }),
+      );
+      await assertFails(
+        put(asOwnerAdmin(), "branding/uploads/huge.png", 3 * KB * KB, png),
+      );
+      await assertFails(
+        put(asOwnerAdmin(), "branding/uploads/logo.png", KB, png),
+      ); // no overwrite
+      await assertFails(
+        deleteObject(ref(asOwnerAdmin(), "branding/uploads/logo.png")),
+      );
+      await assertSucceeds(
+        getBytes(ref(asAnon(), "branding/uploads/logo.png")),
+      );
+      await assertFails(put(asOwnerAdmin(), "branding/elsewhere.png", KB, png));
     });
   });
 });

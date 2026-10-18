@@ -39,10 +39,13 @@ export function LogoMark({ className }: { className?: string }) {
 export function Logo({
   href,
   name,
+  imageSrc,
   className,
 }: {
   href: string;
   name: string;
+  /** A published logo image; the built-in mark is used otherwise. */
+  imageSrc?: string;
   className?: string;
 }) {
   return (
@@ -50,7 +53,16 @@ export function Logo({
       href={href}
       className={cn("flex items-center gap-2.5 rounded-lg", className)}
     >
-      <LogoMark />
+      {imageSrc ? (
+        // eslint-disable-next-line @next/next/no-img-element -- admin-uploaded logo from Storage
+        <img
+          src={imageSrc}
+          alt=""
+          className="h-9 w-auto max-w-32 shrink-0 object-contain"
+        />
+      ) : (
+        <LogoMark />
+      )}
       <span className="text-lg leading-tight font-bold text-primary">
         {name}
       </span>

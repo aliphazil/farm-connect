@@ -15,6 +15,7 @@ import {
   type FarmerProfile,
   type Product,
 } from "@shared/schemas";
+import { parseRange } from "@/features/admin/range";
 import { storageObjectUrl } from "@/features/catalog/images";
 import type {
   DestinationView,
@@ -22,6 +23,7 @@ import type {
   Place,
 } from "@/features/catalog/types";
 import { getAdminDb } from "@/lib/firebase/admin";
+import { getFarmerTotals } from "./analytics";
 import { snapToModel } from "./db";
 
 /**
@@ -275,21 +277,12 @@ async function safe<T>(work: () => Promise<T>): Promise<T | null> {
 export async function getFarmerDashboard(
   uid: string,
 ): Promise<FarmerDashboard> {
-  const events = (type: string) =>
-    db()
-      .collection(COLLECTIONS.siteEvents)
-      .where("farmerId", "==", uid)
-      .where("type", "==", type);
-
-  const [products, views, contactClicks, newEnquiries, invoices, payments] =
+  // Views and contact clicks over the last 30 days (src/services/server/analytics.ts).
+  const range = parseRange({ range: "30d" }, new Date());
+  const [products, traffic, newEnquiries, invoices, payments] =
     await Promise.all([
       listFarmerProducts(uid),
-      safe(
-        async () => (await events("product_view").count().get()).data().count,
-      ),
-      safe(
-        async () => (await events("contact_click").count().get()).data().count,
-      ),
+      safe(() => getFarmerTotals(uid, { from: range.from!, to: range.to })),
       safe(
         async () =>
           (
@@ -320,7 +313,7 @@ export async function getFarmerDashboard(
             await db()
               .collection(COLLECTIONS.payments)
               .where("farmerId", "==", uid)
-              .aggregate({ total: AggregateField.sum("amountLaari") })
+              .aggregate({ total: AggregateField.sum("effectiveLaari") })
               .get()
           ).data().total,
       ),
@@ -338,8 +331,8 @@ export async function getFarmerDashboard(
 
   return {
     products: counts,
-    views,
-    contactClicks,
+    views: traffic?.views ?? null,
+    contactClicks: traffic?.clicks ?? null,
     newEnquiries,
     invoicedLaari: invoices ? (invoices.total ?? 0) : null,
     paymentsLaari: payments === null ? null : (payments ?? 0),

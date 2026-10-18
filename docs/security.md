@@ -85,6 +85,78 @@
     specific action during an investigation, with a reason the user sees.
   - Deciding an appeal against a block needs an owner.
 
+## Invoices and payment ledger
+
+- FarmConnect records payments made directly between buyers and farmers; it
+  doesn't process payments or verify transfers automatically. No payment
+  gateway is integrated.
+- All financial writes are server-side (`src/services/server/finance.ts`);
+  rules deny client writes to orders, invoices, payments, receipts, counters
+  and number guards. Only the owning, active farmer can change their records.
+- Names, units and agreed prices are snapshotted on the transaction and copied
+  to the invoice, so listing edits never change history.
+- Invoice and receipt numbers come from a per-farmer counter, guarded by a
+  global `documentNumbers/{number}` document created in the same
+  transaction, so a number can never be issued twice.
+- Amount paid, outstanding balance and status are recomputed from the
+  ledger in every ledger transaction; the stored `paidLaari` is only a cache
+  (a tampered cache doesn't change what the invoice view or PDF shows).
+- The ledger is append-only. Corrections are reversals (the original stays,
+  marked reversed) or refunds. Farmers can't reverse verified entries.
+- "Verified" can only be set by an administrator with `payments.verify`, and
+  only for a transfer awaiting verification that has a slip or a reference.
+  Admin views of other people's invoices, receipts and slips are logged
+  (`finance.view`).
+- Buyers see their own issued invoices, payments and receipts, never drafts.
+
+## Branding Studio
+
+- Only owner-level admins (`branding.manage`) can save, preview, publish,
+  restore or discard branding, checked in the Server Action and again in the
+  service (`src/services/server/branding.ts`). Moderators and members are
+  refused; the preview route checks the same permission.
+- The public site reads only the published config. Drafts and version
+  history are admin-only collections, so a draft can't leak to visitors.
+- The config has a fixed, validated shape (`shared/schemas/branding.ts`):
+  hex colours with contrast checks, fonts and styles from approved lists,
+  internal paths or https links, social links limited to each platform's
+  domains. Theme values reach the page only as CSS variables built from
+  those validated values (`src/lib/branding/theme.ts`).
+- Rich text is a tiny markup (paragraphs, bold, links) rendered as React
+  elements; no HTML from the editor is ever injected, and unsafe links
+  (javascript:, data:, http:) are shown as plain text.
+- Uploads: owner admins only, PNG/JPEG/WebP (ICO for the favicon), no SVG,
+  size-limited and write-once (Storage rules); the server re-checks type
+  and size of every referenced file on save and publish.
+- Roles, credentials, payment verification and other security settings
+  aren't part of the branding config. Every draft save, publish, restore
+  and discard is in `adminLogs`.
+
+## Marketplace analytics
+
+- Browsers can't write analytics data: events go to `/api/events`
+  (same-origin only, small validated batches, bots ignored, rate-limited per
+  hashed network address and per browser id) and are aggregated with the
+  Admin SDK (`src/services/server/analytics.ts`). Security Rules refuse
+  every client write to the analytics collections, including the legacy
+  `siteEvents`.
+- The server never trusts ids it can derive: a product view must name a
+  public product, and the farmer, category and island are read from the
+  product. A farmer can't credit another farmer's listing with views.
+- No raw events, visitor ids, search words or IP addresses are stored. A
+  random browser id (local storage, not a cookie, not linked to an account)
+  is hashed into day-scoped duplicate markers that expire after 3 days (TTL
+  policy), and into HyperLogLog registers that keep no identifier.
+- Admin browsing isn't counted; farmers' views and clicks on their own
+  listings aren't counted.
+- Aggregates are readable by admins with `analytics.view` (owner and
+  moderator). Farmers see only their own figures, read on the server and
+  filtered by the session uid; they can't read counters directly.
+- Enquiries, registrations, invoices, payments and reports on the dashboards
+  come from those records, not from browser events. A contact click is
+  never shown as a contact, and a payment record never as a verified
+  payment.
+
 ## Authorization layers
 
 1. **Security Rules** (`firebase/*.rules`) — deny by default; enforce ownership,
@@ -115,31 +187,41 @@ cookie), so it isn't CSRF-able.
 
 ## Known limitations / open items
 
-| #   | Issue                                                                                                           | Risk                                                       | Mitigation / next step                                                                              |
-| --- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| 1   | `siteEvents` accepts anonymous creates                                                                          | Spam writes can raise Firestore costs                      | Enable **Firebase App Check** (reCAPTCHA Enterprise) and enforce it for Firestore; budget alerts    |
-| 2   | No App Check on Auth / Firestore / Storage generally                                                            | Scripts can call the APIs directly (still bound by rules)  | Enable App Check before launch                                                                      |
-| 3   | Product and farm-logo images are publicly readable by path, even for draft products                             | Low: images only                                           | Accept, or move drafts under a private path                                                         |
-| 4   | Farmer contact numbers in public farm profiles                                                                  | By design (direct contact)                                 | Shown in the privacy policy; farmers choose what to add                                             |
-| 5   | Role claim changes take effect on next sign-in (sessions are revoked on role change/block)                      | Brief lag only for unblock/approve                         | Acceptable                                                                                          |
-| 6   | Email verification isn't required to use the site                                                               | Fake emails can register                                   | Required for admin grant; consider requiring it for farmers before approval                         |
-| 7   | Sign-in rate limiting relies on Firebase Auth's built-in protection                                             | Brute-force on weak passwords                              | Enable reCAPTCHA/App Check for Auth; consider password policy in console                            |
-| 8   | Storage rules tests not run in CI yet                                                                           | Rules regressions                                          | Run `npm run test:storage-rules` locally; add CI                                                    |
-| 9   | Island list is a seed of capitals + farming islands                                                             | Farmers on other islands can't register a precise location | Expand `islands` collection (admin tool in a later phase)                                           |
-| 10  | Dashboard view/click counts come from anonymous `siteEvents`, which anyone can create with any `farmerId`       | A farmer's counts can be inflated (no data exposure)       | App Check; later aggregate from trusted signals                                                     |
-| 11  | Photos uploaded during a product save that then fails stay in Storage                                           | Storage cost only                                          | Periodic cleanup of objects not referenced by `products.imagePaths`                                 |
-| 12  | Photos of draft products are readable by URL (paths are unguessable but public)                                 | Low                                                        | Accept, or move drafts to a private path                                                            |
-| 13  | A farmer can stuff extra words into a product title to appear in more searches                                  | Search spam (titles are public and reportable)             | Report action on every listing; admin removal; ranking in a future search service                   |
-| 14  | View/click de-duplication is per browser session (sessionStorage), not per person                               | Counts are indicative, not exact                           | Labelled as such on the dashboard; App Check to limit scripted inflation                            |
-| 15  | A contact click only means the buyer opened their phone/chat app                                                | Could be mistaken for a delivered message or sale          | Dashboard hint says so; no "sent"/"sold" status is derived from clicks                              |
-| 16  | Moderators can see private profile details (address, map pin, buyer preferences) needed for review              | Insider misuse                                             | Grant moderator access sparingly; every action is logged; consider masking in a later phase         |
-| 17  | With pre-approval on, edits to an already-approved listing don't go back to review                              | Bait-and-switch after approval                             | Reports + audit history; optionally re-review on title/photo changes                                |
-| 18  | Disabling a category/unit hides it from new listings only (not enforced in rules)                               | A crafted client could still use it                        | Ids remain valid values; enforce in rules if needed                                                 |
-| 19  | Report rate limit is per account; someone with many accounts can still flood reports                            | Review workload                                            | Admin triage (assignment, dismissal); App Check; per-target limits later                            |
-| 20  | Evidence files that fail server checks, or are never attached, stay in Storage                                  | Storage cost only                                          | Periodic cleanup of unattached `reportEvidence/` objects                                            |
-| 21  | Evidence isn't scanned for malware                                                                              | An admin could open a harmful PDF                          | Served sandboxed with nosniff; add a scanning step (e.g. Cloud Functions + a scanner) before launch |
-| 22  | A blocked person can still sign in to Firebase (for appeals) and read their own private records and public data | Low (no writes)                                            | Intended trade-off; disable sign-in manually in the console for extreme cases                       |
-| 23  | Reasons shown to reported users are free text; an admin could still mention the reporter                        | Reporter exposure                                          | UI warning on the field; admin training; review in audit log                                        |
+| #   | Issue                                                                                                                                                    | Risk                                                          | Mitigation / next step                                                                              |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 1   | Anyone can post analytics events to `/api/events` (same-origin check is a browser control, not a barrier for scripts)                                    | Inflated traffic figures                                      | Validation, per-day de-duplication, rate limits; add App Check before launch                        |
+| 2   | No App Check on Auth / Firestore / Storage generally                                                                                                     | Scripts can call the APIs directly (still bound by rules)     | Enable App Check before launch                                                                      |
+| 3   | Product and farm-logo images are publicly readable by path, even for draft products                                                                      | Low: images only                                              | Accept, or move drafts under a private path                                                         |
+| 4   | Farmer contact numbers in public farm profiles                                                                                                           | By design (direct contact)                                    | Shown in the privacy policy; farmers choose what to add                                             |
+| 5   | Role claim changes take effect on next sign-in (sessions are revoked on role change/block)                                                               | Brief lag only for unblock/approve                            | Acceptable                                                                                          |
+| 6   | Email verification isn't required to use the site                                                                                                        | Fake emails can register                                      | Required for admin grant; consider requiring it for farmers before approval                         |
+| 7   | Sign-in rate limiting relies on Firebase Auth's built-in protection                                                                                      | Brute-force on weak passwords                                 | Enable reCAPTCHA/App Check for Auth; consider password policy in console                            |
+| 8   | Storage rules tests not run in CI yet                                                                                                                    | Rules regressions                                             | Run `npm run test:storage-rules` locally; add CI                                                    |
+| 9   | Island list is a seed of capitals + farming islands                                                                                                      | Farmers on other islands can't register a precise location    | Expand `islands` collection (admin tool in a later phase)                                           |
+| 10  | Analytics rate limits are per server instance and in memory                                                                                              | A distributed flood can still add some counts                 | De-duplication caps each browser id; App Check; watch for spikes                                    |
+| 11  | Photos uploaded during a product save that then fails stay in Storage                                                                                    | Storage cost only                                             | Periodic cleanup of objects not referenced by `products.imagePaths`                                 |
+| 12  | Photos of draft products are readable by URL (paths are unguessable but public)                                                                          | Low                                                           | Accept, or move drafts to a private path                                                            |
+| 13  | A farmer can stuff extra words into a product title to appear in more searches                                                                           | Search spam (titles are public and reportable)                | Report action on every listing; admin removal; ranking in a future search service                   |
+| 14  | Unique visitors are per browser; clearing data, private windows and other devices count as new visitors. Ranges use a HyperLogLog estimate (~1.6% error) | Visitor figures are approximate                               | Labelled on the dashboard (exact for single days)                                                   |
+| 15  | A contact click only means the buyer opened their phone/chat app                                                                                         | Could be mistaken for a delivered message or sale             | Dashboard hint says so; no "sent"/"sold" status is derived from clicks                              |
+| 16  | Moderators can see private profile details (address, map pin, buyer preferences) needed for review                                                       | Insider misuse                                                | Grant moderator access sparingly; every action is logged; consider masking in a later phase         |
+| 17  | With pre-approval on, edits to an already-approved listing don't go back to review                                                                       | Bait-and-switch after approval                                | Reports + audit history; optionally re-review on title/photo changes                                |
+| 18  | Disabling a category/unit hides it from new listings only (not enforced in rules)                                                                        | A crafted client could still use it                           | Ids remain valid values; enforce in rules if needed                                                 |
+| 19  | Report rate limit is per account; someone with many accounts can still flood reports                                                                     | Review workload                                               | Admin triage (assignment, dismissal); App Check; per-target limits later                            |
+| 20  | Evidence files that fail server checks, or are never attached, stay in Storage                                                                           | Storage cost only                                             | Periodic cleanup of unattached `reportEvidence/` objects                                            |
+| 21  | Evidence isn't scanned for malware                                                                                                                       | An admin could open a harmful PDF                             | Served sandboxed with nosniff; add a scanning step (e.g. Cloud Functions + a scanner) before launch |
+| 22  | A blocked person can still sign in to Firebase (for appeals) and read their own private records and public data                                          | Low (no writes)                                               | Intended trade-off; disable sign-in manually in the console for extreme cases                       |
+| 23  | Reasons shown to reported users are free text; an admin could still mention the reporter                                                                 | Reporter exposure                                             | UI warning on the field; admin training; review in audit log                                        |
+| 24  | Seller-recorded cash payments can't be independently verified                                                                                            | A dishonest seller could record payments that didn't happen   | Shown as "Recorded by seller"; buyers see every entry and can report                                |
+| 25  | Tax (e.g. GST) isn't calculated or shown                                                                                                                 | Invoices may not meet a registered business's tax obligations | Needs legal/tax validation before tax fields are added                                              |
+| 26  | Dhivehi text in PDFs is laid out right-to-left without full OpenType shaping                                                                             | Some vowel-mark positions may differ from browser rendering   | Checked visually; the print page (browser rendering) is the reference                               |
+| 27  | Uploaded branding images (including unpublished drafts) are publicly readable by URL                                                                     | Low: unguessable names                                        | Accept, or serve drafts from a private path                                                         |
+| 28  | The published config is cached ("branding" tag, refreshed on publish); the proxy's language setting is cached for up to a minute per server instance     | A publish can take up to a minute to affect language routing  | Acceptable                                                                                          |
+| 29  | Admins can't add new fonts or free CSS — only the approved lists                                                                                         | By design ("within approved design limits")                   | Add fonts in code when needed                                                                       |
+| 30  | Analytics counting started with Phase 10; older `siteEvents` aren't included or migrated                                                                 | Earlier activity missing from charts                          | Legacy events stay readable by admins                                                               |
+| 31  | Search words aren't stored, so there is no "top searches" list                                                                                           | Less insight into demand                                      | Only counts and no-result counts are kept (privacy)                                                 |
+| 32  | Duplicate markers rely on a Firestore TTL policy on `analyticsMarks.expireAt`                                                                            | Without it, markers accumulate (storage cost)                 | Deploy the index file (fieldOverrides) or set the TTL policy in the console                         |
+| 33  | A visitor's "new day"/"new session" flags come from the browser                                                                                          | A script can create extra sessions with fresh ids             | Rate limits; each id is counted once                                                                |
 
 ### Buyer portal (consumer phase)
 

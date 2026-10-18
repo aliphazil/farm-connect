@@ -11,6 +11,11 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Fonts read at runtime by the invoice/receipt PDF routes.
+  outputFileTracingIncludes: {
+    "/api/invoices/[id]/pdf": ["./src/lib/pdf/fonts/**"],
+    "/api/receipts/[id]/pdf": ["./src/lib/pdf/fonts/**"],
+  },
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,

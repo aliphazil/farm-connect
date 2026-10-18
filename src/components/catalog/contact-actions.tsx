@@ -1,10 +1,9 @@
 "use client";
 
-import type { Locale } from "@shared/constants/locales";
 import type { ContactChannel } from "@shared/schemas";
 import { whatsappLink } from "@shared/utils/phone";
 import type { FarmerContactView } from "@/features/catalog/types";
-import { logSiteEvent } from "@/services/client/interactions";
+import { trackNow } from "@/services/client/analytics";
 import { buttonClasses } from "@/components/ui/button";
 import { ChatIcon, PhoneIcon } from "@/components/ui/icons";
 
@@ -16,27 +15,12 @@ export type ContactLabels = {
   hidden: string;
 };
 
-/** Repeat clicks on the same button within this window count once. */
-const CLICK_DEDUPE_MS = 30 * 60 * 1000;
-
-/** True the first time in the window; remembers the click in sessionStorage. */
-function firstClick(key: string): boolean {
-  try {
-    const last = Number(sessionStorage.getItem(key));
-    if (last && Date.now() - last < CLICK_DEDUPE_MS) return false;
-    sessionStorage.setItem(key, String(Date.now()));
-  } catch {
-    // Storage unavailable: count the click.
-  }
-  return true;
-}
-
 /**
  * Direct buyer→farmer contact. Renders real tel:/WhatsApp/Viber links only
  * when contact details are provided; otherwise explains why they're hidden.
- * Clicks are counted for the farmer's dashboard when `track` is given — a
- * click means the buyer opened their phone or chat app, not that a message
- * was delivered or a sale happened.
+ * Clicks are counted for analytics when `track` is given — a click means the
+ * buyer's phone or chat app was opened, not that a message was delivered or
+ * a sale happened.
  */
 export function ContactActions({
   contact,
@@ -48,7 +32,7 @@ export function ContactActions({
   labels: ContactLabels;
   /** Prefilled WhatsApp message. */
   message?: string;
-  track?: { locale: Locale; farmerId: string; productId?: string };
+  track?: { farmerId: string; productId?: string };
 }) {
   if (!contact) {
     return (
@@ -58,15 +42,15 @@ export function ContactActions({
     );
   }
 
+  // The server counts each visitor once per button and listing per day.
   const onClick = (channel: ContactChannel) => () => {
     if (!track) return;
-    const key = `fc:click:${channel}:${track.productId ?? track.farmerId}`;
-    if (!firstClick(key)) return;
-    logSiteEvent({
+    trackNow({
       type: "contact_click",
-      ...track,
       channel,
-      path: window.location.pathname,
+      ...(track.productId
+        ? { productId: track.productId }
+        : { farmerId: track.farmerId }),
     });
   };
 

@@ -6,7 +6,7 @@ import { getDictionary, getLocale } from "@/i18n/server";
 import { localeHref } from "@/i18n/paths";
 import { requireAdminPortal } from "@/lib/auth/portal-access";
 import { getAdminStats } from "@/services/server/admin-queries";
-import { parseRange, RANGE_PRESETS } from "@/features/admin/range";
+import { DASHBOARD_PRESETS, parseRange } from "@/features/admin/range";
 import { LiftSuspensions } from "@/features/admin/components/settings-actions";
 import { FilterBar, FilterSelect, Metric } from "@/components/admin/admin-ui";
 import { Alert } from "@/components/ui/alert";
@@ -118,7 +118,10 @@ export default async function AdminDashboard({
           name="range"
           label={d.range}
           value={range.preset}
-          options={RANGE_PRESETS.map((p) => ({ value: p, label: d.ranges[p] }))}
+          options={DASHBOARD_PRESETS.map((p) => ({
+            value: p,
+            label: d.ranges[p],
+          }))}
         />
         <label className="flex flex-col gap-1.5 text-sm font-medium">
           {d.from}
@@ -232,6 +235,11 @@ export default async function AdminDashboard({
             help={m.contactClicks.help}
             badge={d.inPeriod}
           />
+          <div className="flex items-center">
+            <ButtonLink href={admin("/admin/analytics")} variant="secondary">
+              {d.openAnalytics}
+            </ButtonLink>
+          </div>
         </>,
       )}
 

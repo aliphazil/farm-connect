@@ -35,7 +35,7 @@ export function ProductCard({
   const soldOut = availability.kind === "sold_out";
 
   return (
-    <article className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-sm transition-shadow focus-within:ring-2 focus-within:ring-primary hover:shadow-md">
+    <article className="group relative flex h-full flex-col overflow-hidden rounded-[var(--card-radius)] border border-border bg-surface shadow-[var(--card-shadow)] transition-shadow focus-within:ring-2 focus-within:ring-primary hover:shadow-md">
       <div className="relative aspect-[4/3] overflow-hidden bg-primary-soft">
         <ProductImage
           image={listing.image}

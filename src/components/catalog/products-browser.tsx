@@ -24,6 +24,7 @@ import { ChevronIcon } from "@/components/ui/icons";
 import { Pagination } from "@/components/ui/pagination";
 import { FilterPanel } from "./filter-panel";
 import { ProductGrid, ProductGridSkeleton } from "./product-grid";
+import { TrackCatalog } from "./track-catalog";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -154,6 +155,15 @@ export async function ProductsBrowser({
         />
       </aside>
       <div className="min-w-0">
+        {!isSampleCatalog && firstPage ? (
+          <TrackCatalog
+            q={filters.q}
+            noResults={items.length === 0}
+            category={filters.category}
+            atoll={filters.atoll}
+            island={filters.island}
+          />
+        ) : null}
         <p role="status" className="mb-4 text-sm font-medium text-muted">
           {countLabel}
         </p>

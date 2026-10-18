@@ -113,6 +113,12 @@ export default async function FarmerDashboardPage() {
             {t.viewEnquiries}
           </ButtonLink>
           <ButtonLink
+            href={localeHref(locale, "/farmer/analytics")}
+            variant="secondary"
+          >
+            {t.openAnalytics}
+          </ButtonLink>
+          <ButtonLink
             href={localeHref(locale, "/farmer/delivery")}
             variant="secondary"
           >

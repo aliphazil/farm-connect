@@ -6,7 +6,17 @@
  */
 :root {
   --brand-primary: #15803d;
+  --brand-secondary: #e9f2ec;
   --brand-accent: #0e7490;
+
+  /* Branding Studio style choices (see src/lib/branding/theme.ts). */
+  --font-body:
+    var(--nf-inter), var(--nf-thaana), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-body);
+  --heading-weight: 700;
+  --btn-radius: 0.5rem;
+  --card-radius: 0.75rem;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
 
   --background: #fafaf7;
   --surface: #ffffff;
@@ -26,6 +36,7 @@
   --color-primary-hover: color-mix(in oklab, var(--brand-primary) 82%, black);
   --color-primary-soft: color-mix(in oklab, var(--brand-primary) 10%, white);
   --color-accent: var(--brand-accent);
+  --color-secondary: var(--brand-secondary);
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-foreground: var(--foreground);
@@ -37,8 +48,7 @@
   --color-info: var(--info);
 
   /* --nf-* variables are provided by next/font in the root layout. */
-  --font-sans:
-    var(--nf-inter), var(--nf-thaana), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-body);
   --font-thaana:
     var(--nf-thaana), var(--nf-inter), ui-sans-serif, system-ui, sans-serif;
 }
@@ -46,6 +56,13 @@
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+/* Headings follow the published heading font and weight. */
+h1,
+h2 {
+  font-family: var(--font-heading);
+  font-weight: var(--heading-weight) !important;
 }
 
 /* Thaana reads better a little larger with more line height. */

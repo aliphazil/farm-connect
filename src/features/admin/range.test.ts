@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseRange } from "./range";
+import { ANALYTICS_PRESETS, parseRange } from "./range";
 
 // 2026-10-18 10:00 in Maldives (05:00 UTC)
 const NOW = new Date("2026-10-18T05:00:00Z");
@@ -37,5 +37,44 @@ describe("parseRange", () => {
       parseRange({ range: "custom", from: "2026-02-30" }, NOW).preset,
     ).toBe("30d");
     expect(parseRange({ range: "bogus" }, NOW).preset).toBe("30d");
+  });
+
+  it("today is the current Maldives day, even late in the UTC day", () => {
+    const opts = { presets: ANALYTICS_PRESETS };
+    const r = parseRange({ range: "today" }, NOW, opts);
+    expect(r.from?.toISOString()).toBe("2026-10-17T19:00:00.000Z");
+    expect(r.to.toISOString()).toBe("2026-10-18T18:59:59.999Z");
+    // 18 Oct 19:30 UTC is already 19 Oct 00:30 in Malé.
+    const late = parseRange(
+      { range: "today" },
+      new Date("2026-10-18T19:30:00Z"),
+      opts,
+    );
+    expect(late.fromDay).toBe("2026-10-19");
+    // 18:59 UTC is still 18 Oct (23:59 MVT).
+    expect(
+      parseRange({ range: "today" }, new Date("2026-10-18T18:59:00Z"), opts)
+        .fromDay,
+    ).toBe("2026-10-18");
+  });
+
+  it("analytics pages only offer bounded presets and cap long custom ranges", () => {
+    const opts = { presets: ANALYTICS_PRESETS, maxDays: 366 };
+    expect(parseRange({ range: "all" }, NOW, opts).preset).toBe("30d");
+    expect(parseRange({ range: "90d" }, NOW, opts).preset).toBe("30d");
+    const long = parseRange(
+      { range: "custom", from: "2020-01-01", to: "2026-10-18" },
+      NOW,
+      opts,
+    );
+    expect(long.clamped).toBe(true);
+    expect(long.fromDay).toBe("2025-10-18");
+    const ok = parseRange(
+      { range: "custom", from: "2026-10-01", to: "2026-10-07" },
+      NOW,
+      opts,
+    );
+    expect(ok.clamped).toBeUndefined();
+    expect([ok.fromDay, ok.toDay]).toEqual(["2026-10-01", "2026-10-07"]);
   });
 });

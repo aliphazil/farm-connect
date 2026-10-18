@@ -67,14 +67,7 @@ export function ProductDetailView({
 
   return (
     <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
-      {track ? (
-        <TrackView
-          type="product_view"
-          locale={locale}
-          productId={listing.id}
-          farmerId={listing.farmer.id}
-        />
-      ) : null}
+      {track ? <TrackView type="product_view" productId={listing.id} /> : null}
       <div>
         <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-primary-soft">
           <ProductImage
@@ -209,7 +202,7 @@ export function ProductDetailView({
             message={title}
             track={
               track
-                ? { locale, farmerId: listing.farmer.id, productId: listing.id }
+                ? { farmerId: listing.farmer.id, productId: listing.id }
                 : undefined
             }
           />

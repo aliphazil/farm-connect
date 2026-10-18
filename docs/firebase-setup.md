@@ -64,6 +64,11 @@ accept it, or uploads will be denied.
 
 Indexes take a few minutes to build (Firebase console → Firestore → Indexes).
 
+The index file also sets a **TTL policy** on `analyticsMarks.expireAt`
+(analytics duplicate markers delete themselves after 3 days). If your CLI
+version doesn't apply it, add it in the console: Firestore → _Time-to-live_
+→ collection group `analyticsMarks`, field `expireAt`.
+
 ## 4. Import the official island list
 
 The app never hardcodes islands: atoll/island pickers, filters and labels read

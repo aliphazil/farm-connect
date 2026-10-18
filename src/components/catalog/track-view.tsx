@@ -1,40 +1,26 @@
 "use client";
 
 import { useEffect } from "react";
-import type { Locale } from "@shared/constants/locales";
-import type { SiteEventType } from "@shared/schemas";
-import { logSiteEvent } from "@/services/client/interactions";
+import { oncePerSession, track } from "@/services/client/analytics";
 
 /**
- * Records one usage event per page per browser session (deduplicated in
- * sessionStorage) for the farmer's dashboard. Renders nothing.
+ * Reports a product or farm page view. The server counts each visitor once
+ * per page per day; this only avoids repeat requests. Renders nothing.
  */
-export function TrackView({
-  type,
-  locale,
-  productId,
-  farmerId,
-}: {
-  type: Extract<SiteEventType, "product_view" | "farmer_view">;
-  locale: Locale;
-  productId?: string;
-  farmerId: string;
-}) {
+export function TrackView(
+  props:
+    | { type: "product_view"; productId: string }
+    | { type: "farmer_view"; farmerId: string },
+) {
+  const id = props.type === "product_view" ? props.productId : props.farmerId;
+  const { type } = props;
   useEffect(() => {
-    const key = `fc:${type}:${productId ?? farmerId}`;
-    try {
-      if (sessionStorage.getItem(key)) return;
-      sessionStorage.setItem(key, "1");
-    } catch {
-      // Storage unavailable (private mode): still count once per page load.
-    }
-    logSiteEvent({
-      type,
-      locale,
-      productId,
-      farmerId,
-      path: window.location.pathname,
-    });
-  }, [type, locale, productId, farmerId]);
+    if (!oncePerSession(`${type}:${id}`)) return;
+    track(
+      type === "product_view"
+        ? { type, productId: id }
+        : { type, farmerId: id },
+    );
+  }, [type, id]);
   return null;
 }

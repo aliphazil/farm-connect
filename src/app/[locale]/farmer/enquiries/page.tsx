@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { placeText } from "@shared/constants/geography";
 import { pickLocalized } from "@shared/constants/locales";
 import { fill } from "@shared/i18n/format";
 import { formatDate } from "@shared/utils/date";
 import { getDictionary, getLocale } from "@/i18n/server";
+import { localeHref } from "@/i18n/paths";
 import { requireFarmerPortal } from "@/lib/auth/portal-access";
 import { getFarmerProfile, getUserAccount } from "@/services/server/accounts";
 import { ReportForm } from "@/features/consumer/components/report-form";
@@ -90,6 +92,17 @@ export default async function FarmerEnquiriesPage() {
                   productTitle={productTitle}
                   dict={dict}
                 />
+                {e.status === "accepted" || e.status === "completed" ? (
+                  <Link
+                    href={localeHref(
+                      locale,
+                      `/farmer/sales/new?enquiry=${e.id}`,
+                    )}
+                    className="self-start text-sm font-medium text-primary underline"
+                  >
+                    {dict.sales.fromEnquiry}
+                  </Link>
+                ) : null}
                 {canReport ? (
                   <ReportForm
                     targetType="enquiry"

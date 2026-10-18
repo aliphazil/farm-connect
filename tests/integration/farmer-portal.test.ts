@@ -10,6 +10,7 @@ import {
 import { ref, uploadBytes } from "firebase/storage";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { COLLECTIONS } from "@shared/firestore-paths";
+import { maldivesDay } from "@shared/utils/date";
 import { buildEnquiryCreate } from "@shared/payloads";
 import type { ProductInput } from "@shared/schemas";
 import { getAdminAuth, getAdminDb } from "@/lib/firebase/admin";
@@ -427,19 +428,16 @@ describe("enquiries", () => {
 describe("dashboard", () => {
   it("reports real figures from the farmer's records", async () => {
     const db = getAdminDb();
-    const event = (type: string) => ({
-      type,
-      locale: "en",
-      farmerId: farmerA.uid,
-      createdAt: new Date(),
-    });
-    await Promise.all([
-      db.collection(COLLECTIONS.siteEvents).add(event("product_view")),
-      db.collection(COLLECTIONS.siteEvents).add(event("product_view")),
-      db.collection(COLLECTIONS.siteEvents).add(event("contact_click")),
+    // Analytics counters as /api/events writes them (today, Maldives time).
+    const today = maldivesDay(new Date());
+    const counters = (uid: string, data: object) =>
       db
-        .collection(COLLECTIONS.siteEvents)
-        .add({ ...event("product_view"), farmerId: farmerB.uid }),
+        .collection(COLLECTIONS.analyticsFarmerDaily)
+        .doc(`${today}_${uid}`)
+        .set({ day: today, farmerId: uid, ...data });
+    await Promise.all([
+      counters(farmerA.uid, { productViews: 2, contactClicks: 1 }),
+      counters(farmerB.uid, { productViews: 5 }),
       db.collection(COLLECTIONS.invoices).add({
         farmerId: farmerA.uid,
         status: "issued",
@@ -452,10 +450,13 @@ describe("dashboard", () => {
         totalLaari: 99999,
         paidLaari: 0,
       }),
+      // As written by the ledger service (signed effective amount included).
       db.collection(COLLECTIONS.payments).add({
         farmerId: farmerA.uid,
+        kind: "payment",
         amountLaari: 2500,
-        verificationStatus: "unverified",
+        effectiveLaari: 2500,
+        verificationStatus: "recorded",
       }),
     ]);
     const d = await getFarmerDashboard(farmerA.uid);

@@ -88,5 +88,19 @@ service firebase.storage {
       allow read: if true;
       allow write: if false;
     }
+    // Branding Studio uploads: owner-level admins only, raster images (no SVG,
+    // which can carry script), small, write-once. Public to read, because
+    // published images are shown to everyone; the server checks each file
+    // again when a draft is saved.
+    function isOwnerAdmin() {
+      return isAdmin() && request.auth.token.get('adminLevel', '') == 'owner';
+    }
+    match /branding/uploads/{fileName} {
+      allow read: if true;
+      allow create: if resource == null && isOwnerAdmin() && safeName(fileName)
+        && request.resource.size <= 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp|x-icon|vnd[.]microsoft[.]icon)');
+      allow update, delete: if false;
+    }
   }
 }

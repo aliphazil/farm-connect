@@ -1,16 +1,13 @@
+import Link from "next/link";
 import { pickLocalized } from "@shared/constants/locales";
 import { formatDate } from "@shared/utils/date";
 import { formatMVR } from "@shared/utils/money";
 import { getDictionary, getLocale } from "@/i18n/server";
+import { localeHref } from "@/i18n/paths";
 import { requireConsumerPortal } from "@/lib/auth/portal-access";
 import { listConsumerFinance } from "@/services/server/consumer";
+import { InvoiceStatusBadge } from "@/components/finance/invoice-view";
 import { Badge, PageHeader } from "@/components/ui/layout-primitives";
-
-const VERIFY_TONE = {
-  unverified: "neutral",
-  verified: "success",
-  rejected: "danger",
-} as const;
 
 export default async function MyInvoicesPage() {
   const user = await requireConsumerPortal();
@@ -21,11 +18,6 @@ export default async function MyInvoicesPage() {
   ]);
   const t = dict.account.invoices;
   const money = (laari: number) => formatMVR(laari, locale);
-  const verifyLabel = {
-    unverified: t.unverified,
-    verified: t.verified,
-    rejected: t.rejected,
-  } as const;
   const th = "px-3 py-2 text-start font-medium text-muted";
   const td = "px-3 py-2";
 
@@ -44,15 +36,22 @@ export default async function MyInvoicesPage() {
         ) : (
           <div className="overflow-x-auto rounded-xl border border-border bg-surface">
             <table className="w-full min-w-[36rem] text-sm">
+              <caption className="sr-only">{t.invoicesTitle}</caption>
               <thead className="border-b border-border">
                 <tr>
-                  <th className={th}>{t.number}</th>
-                  <th className={th}>{dict.account.enquiries.farm}</th>
-                  <th className={th}>{t.date}</th>
-                  <th className={th}>{t.total}</th>
-                  <th className={th}>{t.paid}</th>
-                  <th className={th}>{t.balance}</th>
-                  <th className={th}>{t.status}</th>
+                  {[
+                    t.number,
+                    dict.account.enquiries.farm,
+                    t.date,
+                    t.total,
+                    t.paid,
+                    t.balance,
+                    t.status,
+                  ].map((h) => (
+                    <th key={h} scope="col" className={th}>
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -61,7 +60,14 @@ export default async function MyInvoicesPage() {
                     key={i.id}
                     className="border-b border-border last:border-0"
                   >
-                    <td className={`${td} font-medium`}>{i.number}</td>
+                    <td className={`${td} font-medium`}>
+                      <Link
+                        href={localeHref(locale, `/documents/invoices/${i.id}`)}
+                        className="text-primary underline"
+                      >
+                        {i.number ?? "—"}
+                      </Link>
+                    </td>
                     <td className={td}>
                       {i.farmName ? pickLocalized(i.farmName, locale) : "—"}
                     </td>
@@ -71,20 +77,12 @@ export default async function MyInvoicesPage() {
                     <td className={td}>{money(i.totalLaari)}</td>
                     <td className={td}>{money(i.paidLaari)}</td>
                     <td className={td}>
-                      {money(Math.max(0, i.totalLaari - i.paidLaari))}
+                      {i.status === "cancelled" || i.status === "refunded"
+                        ? "—"
+                        : money(Math.max(0, i.totalLaari - i.paidLaari))}
                     </td>
                     <td className={td}>
-                      <Badge
-                        tone={
-                          i.status === "paid"
-                            ? "success"
-                            : i.status === "void"
-                              ? "neutral"
-                              : "warning"
-                        }
-                      >
-                        {dict.invoiceStatus[i.status]}
-                      </Badge>
+                      <InvoiceStatusBadge status={i.status} dict={dict} />
                     </td>
                   </tr>
                 ))}
@@ -105,32 +103,72 @@ export default async function MyInvoicesPage() {
         ) : (
           <div className="overflow-x-auto rounded-xl border border-border bg-surface">
             <table className="w-full min-w-[32rem] text-sm">
+              <caption className="sr-only">{t.paymentsTitle}</caption>
               <thead className="border-b border-border">
                 <tr>
-                  <th className={th}>{t.date}</th>
-                  <th className={th}>{t.number}</th>
-                  <th className={th}>{t.method}</th>
-                  <th className={th}>{t.amount}</th>
-                  <th className={th}>{t.status}</th>
+                  {[
+                    t.date,
+                    t.number,
+                    dict.finance.kind,
+                    t.method,
+                    t.amount,
+                    t.status,
+                    dict.finance.receipt,
+                  ].map((h) => (
+                    <th key={h} scope="col" className={th}>
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {payments.map((p) => (
-                  <tr
-                    key={p.id}
-                    className="border-b border-border last:border-0"
-                  >
-                    <td className={td}>{formatDate(p.receivedAt, locale)}</td>
-                    <td className={td}>{p.invoiceNumber ?? "—"}</td>
-                    <td className={td}>{dict.paymentMethods[p.method]}</td>
-                    <td className={td}>{money(p.amountLaari)}</td>
-                    <td className={td}>
-                      <Badge tone={VERIFY_TONE[p.verificationStatus]}>
-                        {verifyLabel[p.verificationStatus]}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
+                {payments
+                  .filter((p) => p.kind !== "reversal")
+                  .map((p) => (
+                    <tr
+                      key={p.id}
+                      className="border-b border-border last:border-0"
+                    >
+                      <td className={td}>{formatDate(p.receivedAt, locale)}</td>
+                      <td className={td}>{p.invoiceNumber ?? "—"}</td>
+                      <td className={td}>{dict.ledgerKinds[p.kind]}</td>
+                      <td className={td}>{dict.paymentMethods[p.method]}</td>
+                      <td className={td}>
+                        {p.kind === "refund" ? "− " : ""}
+                        {money(p.amountLaari)}
+                      </td>
+                      <td className={td}>
+                        <Badge
+                          tone={
+                            p.reversed || p.verificationStatus === "rejected"
+                              ? "danger"
+                              : p.verificationStatus === "verified"
+                                ? "success"
+                                : "neutral"
+                          }
+                        >
+                          {p.reversed
+                            ? dict.paymentStatus.reversed
+                            : dict.paymentStatus[p.verificationStatus]}
+                        </Badge>
+                      </td>
+                      <td className={td}>
+                        {p.receiptId ? (
+                          <Link
+                            href={localeHref(
+                              locale,
+                              `/documents/receipts/${p.receiptId}`,
+                            )}
+                            className="text-primary underline"
+                          >
+                            {dict.finance.receipt}
+                          </Link>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>

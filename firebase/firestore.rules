@@ -147,6 +147,16 @@ service cloud.firestore {
       allow read: if true;
       allow write: if false;
     }
+    // Branding Studio drafts and history: admins read, server writes. Only the
+    // published version (siteSettings/branding) is public.
+    match /brandingDrafts/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /brandingVersions/{versionId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
     match /siteContent/{contentId} {
       allow read: if resource.data.published == true || isAdmin();
       allow write: if false;
@@ -458,24 +468,35 @@ service cloud.firestore {
     }
 
     // ---------- analytics & audit ----------
-    // Anonymous usage events: create-only, strictly shaped, no reads except admins.
+    // Analytics. Browsers report events to /api/events, which validates,
+    // de-duplicates and aggregates them with the Admin SDK; nothing here is
+    // writable from a browser. Legacy raw events (siteEvents) stay readable
+    // by admins but no longer accept writes.
     match /siteEvents/{eventId} {
       allow read: if isAdmin();
-      allow create: if data().keys().hasAll(['type', 'locale', 'createdAt'])
-        && data().keys().hasOnly(['type', 'locale', 'path', 'productId', 'farmerId', 'channel', 'uid', 'createdAt'])
-        && (!('channel' in data()) || (data().type == 'contact_click' && data().channel in ['call', 'whatsapp', 'viber']))
-        && data().type in ['page_view', 'product_view', 'farmer_view', 'search', 'contact_click']
-        && locale(data().locale)
-        && optStr(data(), 'path', 200)
-        && optStr(data(), 'productId', 128)
-        && optStr(data(), 'farmerId', 128)
-        && (!('uid' in data()) || (signedIn() && data().uid == uid()))
-        && stampedNow('createdAt');
-      allow update, delete: if false;
+      allow write: if false;
     }
     match /analyticsDaily/{day} {
       allow read: if isAdmin();
       allow write: if false;
+      match /{sub}/{shard} {
+        allow read: if isAdmin();
+        allow write: if false;
+      }
+    }
+    // Per-listing / per-farm counters: farmers see their own through the
+    // server (filtered by the session), never by direct reads.
+    match /analyticsProductDaily/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /analyticsFarmerDaily/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    // Short-lived duplicate markers: server only.
+    match /analyticsMarks/{id} {
+      allow read, write: if false;
     }
     match /adminLogs/{logId} {
       allow read: if isAdmin();

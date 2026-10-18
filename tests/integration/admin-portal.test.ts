@@ -1,9 +1,11 @@
 import { randomInt, randomUUID } from "node:crypto";
+import { FieldValue } from "firebase-admin/firestore";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { dictionaries } from "@shared/i18n";
 import { COLLECTIONS } from "@shared/firestore-paths";
+import { maldivesDay } from "@shared/utils/date";
 import { buildFavourite } from "@shared/payloads";
 import type { ProductInput } from "@shared/schemas";
 import { getAdminAuth, getAdminDb } from "@/lib/firebase/admin";
@@ -629,16 +631,21 @@ describe("reference data", () => {
 describe("dashboard and lists", () => {
   it("statistics come from real records and respect the date range", async () => {
     const now = new Date();
-    await db()
-      .collection(COLLECTIONS.siteEvents)
-      .add({ type: "page_view", locale: "en", createdAt: now });
-    await db()
-      .collection(COLLECTIONS.siteEvents)
-      .add({
-        type: "page_view",
-        locale: "en",
-        createdAt: new Date("2020-01-01T00:00:00Z"),
-      });
+    // Visit counters as /api/events writes them: today and ten days ago.
+    const visit = (date: Date) => {
+      const day = maldivesDay(date);
+      return db()
+        .collection(COLLECTIONS.analyticsDaily)
+        .doc(day)
+        .collection("shards")
+        .doc("0")
+        .set(
+          { day, counts: { sessions: FieldValue.increment(1) } },
+          { merge: true },
+        );
+    };
+    await visit(now);
+    await visit(new Date(now.getTime() - 10 * 24 * 3600_000));
 
     const all = await getAdminStats({
       from: null,
@@ -648,7 +655,7 @@ describe("dashboard and lists", () => {
       from: new Date(now.getTime() - 60_000),
       to: new Date(now.getTime() + 1000),
     });
-    expect(all.visits! - recent.visits!).toBeGreaterThanOrEqual(1); // the 2020 visit is outside the range
+    expect(all.visits! - recent.visits!).toBeGreaterThanOrEqual(1); // the older visit is outside the range
     expect(recent.visits).toBeGreaterThanOrEqual(1);
     expect(all.users.farmers).toBeGreaterThanOrEqual(1);
     expect(all.users.consumers).toBeGreaterThanOrEqual(1);

@@ -17,12 +17,15 @@ export default async function AdminLayout({
       checkingLabel={dict.portal.checkingAccess}
       items={[
         { href: href("/admin"), label: t.dashboard, exact: true },
+        { href: href("/admin/analytics"), label: t.analytics },
         { href: href("/admin/farmers"), label: t.farmers },
         { href: href("/admin/buyers"), label: t.buyers },
         { href: href("/admin/products"), label: t.listings },
         { href: href("/admin/reports"), label: t.reports },
         { href: href("/admin/appeals"), label: t.appeals },
+        { href: href("/admin/payments"), label: t.payments },
         { href: href("/admin/reference"), label: t.reference },
+        { href: href("/admin/branding"), label: t.branding },
         { href: href("/admin/settings"), label: t.settings },
         { href: href("/admin/logs"), label: t.logs },
       ]}

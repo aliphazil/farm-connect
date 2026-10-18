@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { DocumentSnapshot, Query } from "firebase-admin/firestore";
+import { io } from "next/cache";
 import { COLLECTIONS } from "@shared/firestore-paths";
 import { parseDoc } from "@shared/firestore-convert";
 import { productSchema, type Product } from "@shared/schemas";
@@ -116,6 +117,9 @@ export async function searchProductsLive(
   after?: string,
   pageSize = PAGE_SIZE,
 ): Promise<LiveSearchResult> {
+  // Live results depend on the current time (availability dates), so this
+  // must run at request time, never during prerendering.
+  await io();
   const plan = planSearch(f);
   const base = buildQuery(f, plan);
   const now = new Date();

@@ -7,7 +7,7 @@ import { LOCALE_LABEL, LOCALES, type Locale } from "@shared/constants/locales";
 import { cn } from "@/lib/cn";
 import { LOCALE_COOKIE, switchLocalePath } from "@/i18n/paths";
 
-type Props = { current: Locale; label: string };
+type Props = { current: Locale; label: string; locales?: readonly Locale[] };
 
 /**
  * Links to the same page in each language and remembers the choice.
@@ -30,10 +30,11 @@ function LocaleLinks({
   current,
   label,
   pathname,
+  locales = LOCALES,
 }: Props & { pathname: string | null }) {
   return (
     <nav aria-label={label} className="flex items-center gap-1 text-sm">
-      {LOCALES.map((locale) => (
+      {locales.map((locale) => (
         <Link
           key={locale}
           href={pathname ? switchLocalePath(pathname, locale) : `/${locale}`}

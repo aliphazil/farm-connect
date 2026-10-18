@@ -343,7 +343,13 @@ export const CONTENT: Record<ContentPageKey, Record<Locale, ContentPage>> = {
           bullets: [
             "To run the marketplace and show listings to buyers.",
             "To keep the platform safe, including reviewing reports and blocking accounts.",
-            "To produce overall usage statistics. These do not identify individuals.",
+            "To produce overall usage statistics (daily totals such as page views, product views and contact clicks). These do not identify individuals.",
+          ],
+        },
+        {
+          heading: "Usage statistics",
+          paragraphs: [
+            "To count visits without identifying you, your browser keeps a random number in its local storage (not a cookie, and not linked to your account). Pages you open are added to daily totals; we don't keep a record of individual visits, your search words or your network address. Clearing your browser's site data removes the number.",
           ],
         },
         {
@@ -385,7 +391,13 @@ export const CONTENT: Record<ContentPageKey, Record<Locale, ContentPage>> = {
           bullets: [
             "ބާޒާރު ހިންގައި، ގަންނަ ފަރާތްތަކަށް ލިސްޓިންގތައް ދެއްކުމަށް.",
             "ރިޕޯޓްތައް ބެލުމާއި އެކައުންޓްތައް ބްލޮކް ކުރުން ހިމެނޭގޮތަށް، ޕްލެޓްފޯމް ރައްކާތެރިކޮށް ބެހެއްޓުމަށް.",
-            "ޖުމްލަ ބޭނުންކުރުމުގެ ތަފާސް ހިސާބު ތައްޔާރު ކުރުމަށް. މިއިން ވަކި ފަރާތެއް ދެނެގަނެވޭކަށް ނެތެވެ.",
+            "ޖުމްލަ ބޭނުންކުރުމުގެ ތަފާސް ހިސާބު (ޞަފްޙާ ބެލުން، ޕްރޮޑަކްޓް ބެލުން އަދި ގުޅުމަށް ފިތާލުން ފަދަ ދުވާލަކު ޖުމްލަ އަދަދު) ތައްޔާރު ކުރުމަށް. މިއިން ވަކި ފަރާތެއް ދެނެގަނެވޭކަށް ނެތެވެ.",
+          ],
+        },
+        {
+          heading: "ބޭނުންކުރުމުގެ ތަފާސް ހިސާބު",
+          paragraphs: [
+            "ތިޔަބޭފުޅާ ދެނެނުގަނެ ޒިޔާރަތްތައް ގުނުމަށް، ތިޔަބޭފުޅާގެ ބްރައުޒަރުގެ ލޯކަލް ސްޓޯރޭޖުގައި ރެންޑަމް ނަންބަރެއް ރައްކާކުރެއެވެ (މިއީ ކުކީއެއް ނޫން، އަދި އެކައުންޓާ ގުޅިފައެއް ނުވެއެވެ). ހުޅުވާ ޞަފްޙާތައް ހިމެނެނީ ދުވާލަކު ޖުމްލަ އަދަދުތަކުގައެވެ. ވަކި ޒިޔާރަތްތަކުގެ ރެކޯޑެއް، ހޯދި ބަސްތަކެއް ނުވަތަ ނެޓްވޯކް އެޑްރެސެއް ރައްކާ ނުކުރެއެވެ. ބްރައުޒަރުގެ ސައިޓް ޑޭޓާ ފޮހެލުމުން އެ ނަންބަރު ފޮހެވެއެވެ.",
           ],
         },
         {

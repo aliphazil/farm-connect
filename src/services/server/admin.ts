@@ -20,16 +20,13 @@ import {
   REPORT_OUTCOMES,
   REPORT_REASONS,
   REPORT_STATUSES,
-  brandingInputSchema,
   islandInputSchema,
   isFarmPublic,
   isProductPublic,
   referenceLabelInputSchema,
-  type BrandingInput,
   type FarmerApprovalStatus,
   type IslandInput,
   type ModerationActionType,
-  type PaymentVerification,
   type ProductModeration,
   type ReferenceLabelInput,
   type ReportStatus,
@@ -41,6 +38,7 @@ import {
 import { getAdminAuth, getAdminDb } from "@/lib/firebase/admin";
 import { addAdminLog, addModerationAction, col, serverNow } from "./db";
 import { releaseGuard } from "./reports";
+import { FinanceError, reverseEntry, setVerification } from "./finance";
 
 /**
  * Privileged operations. Callers MUST pass an actor obtained from a verified
@@ -1389,46 +1387,64 @@ export async function createInternalReport(
 // Payments, branding and settings
 // ---------------------------------------------------------------------------
 
+async function viaFinance<T>(work: () => Promise<T>): Promise<T> {
+  try {
+    return await work();
+  } catch (error) {
+    if (error instanceof FinanceError)
+      throw new AdminOperationError(
+        error.code === "not_found"
+          ? "not_found"
+          : error.code === "invalid_input"
+            ? "invalid_input"
+            : "invalid_state",
+      );
+    throw error;
+  }
+}
+
+/**
+ * Verifies or rejects a seller-recorded transfer. Only entries awaiting
+ * verification, and "verified" only with a slip or reference as evidence.
+ * The invoice's paid amount and status are recomputed from the ledger.
+ */
 export async function verifyPayment(
   actor: Actor,
   paymentId: string,
-  status: Exclude<PaymentVerification, "unverified">,
+  status: "verified" | "rejected",
+  note?: string,
 ) {
   assertCan(actor, "payments.verify");
-  const ref = col(COLLECTIONS.payments).doc(paymentId);
-  if (!(await ref.get()).exists) throw new AdminOperationError("not_found");
-  const batch = getAdminDb().batch();
-  batch.update(ref, {
-    verificationStatus: status,
-    verifiedBy: actor.uid,
-    verifiedAt: serverNow(),
-    updatedAt: serverNow(),
-  });
-  addAdminLog(batch, {
-    actorId: actor.uid,
-    action: "payment.verification",
-    targetType: "payment",
-    targetId: paymentId,
-    details: { status },
-  });
-  await batch.commit();
+  if (status !== "verified" && status !== "rejected")
+    throw new AdminOperationError("invalid_input");
+  await viaFinance(() => setVerification(actor, paymentId, status, note));
 }
 
-export async function publishBranding(actor: Actor, input: BrandingInput) {
-  assertCan(actor, "settings.manage");
-  const parsed = brandingInputSchema.safeParse(input);
-  if (!parsed.success) throw new AdminOperationError("invalid_input");
+/** Reverses any ledger entry (including verified ones), keeping it on record. */
+export async function reverseLedgerEntry(
+  actor: Actor,
+  paymentId: string,
+  reason: string,
+) {
+  assertCan(actor, "payments.verify");
+  return viaFinance(() =>
+    reverseEntry(actor, paymentId, reason, { asAdmin: true }),
+  );
+}
+
+/** Admin access to another person's financial records is logged. */
+export async function logFinanceView(
+  actor: Actor,
+  targetType: "invoice" | "receipt" | "payment",
+  targetId: string,
+) {
+  assertCan(actor, "admin.view");
   const batch = getAdminDb().batch();
-  batch.set(col(COLLECTIONS.siteSettings).doc(SITE_SETTINGS_DOCS.branding), {
-    ...parsed.data,
-    updatedAt: serverNow(),
-    updatedBy: actor.uid,
-  });
   addAdminLog(batch, {
     actorId: actor.uid,
-    action: "branding.publish",
-    targetType: "siteSettings",
-    targetId: SITE_SETTINGS_DOCS.branding,
+    action: "finance.view",
+    targetType,
+    targetId,
   });
   await batch.commit();
 }

@@ -85,7 +85,8 @@
     "how2Title": "Contact the farmer",
     "how2Body": "Call or message the farmer directly.",
     "how3Title": "Arrange delivery",
-    "how3Body": "Agree delivery and payment with the farmer. There are no online payments."
+    "how3Body": "Agree delivery and payment with the farmer. There are no online payments.",
+    "promosLabel": "Promotions"
   },
   "products": {
     "title": "All products",
@@ -334,7 +335,19 @@
     "terms": "Terms of use",
     "privacy": "Privacy",
     "reporting": "Reporting & safety",
-    "credits": "Photo credits"
+    "credits": "Photo credits",
+    "more": "More",
+    "contactTitle": "Contact",
+    "followUs": "Follow us",
+    "social": {
+      "facebook": "Facebook",
+      "instagram": "Instagram",
+      "tiktok": "TikTok",
+      "x": "X",
+      "youtube": "YouTube",
+      "whatsapp": "WhatsApp",
+      "viber": "Viber"
+    }
   },
   "pages": {
     "draftNotice": "Draft for review. This text has not yet been approved and may change before launch.",
@@ -378,7 +391,8 @@
       "products": "Products",
       "enquiries": "Enquiries",
       "delivery": "Delivery",
-      "profile": "Farm profile"
+      "profile": "Farm profile",
+      "analytics": "Analytics"
     },
     "dashboard": {
       "title": "Dashboard",
@@ -387,9 +401,9 @@
       "inactiveProducts": "Not published",
       "inactiveHint": "Drafts, paused, sold out or removed",
       "views": "Product views",
-      "viewsHint": "Product page visits, counted once per visitor session",
+      "viewsHint": "Product page views in the last 30 days (each visitor once per product per day). See Analytics for more.",
       "contactClicks": "Contact clicks",
-      "contactHint": "Taps on Call, WhatsApp or Viber (repeat taps within 30 minutes count once). A tap opens the buyer’s phone or chat app — it doesn’t mean a message was delivered or a sale was made.",
+      "contactHint": "Taps on Call, WhatsApp or Viber in the last 30 days. A tap opens the buyer’s phone or chat app — it doesn’t mean a message was delivered or a sale was made.",
       "newEnquiries": "New enquiries",
       "invoiceTotal": "Invoiced",
       "invoiceHint": "Issued invoices (excluding drafts and void)",
@@ -402,7 +416,8 @@
       "viewEnquiries": "View enquiries",
       "completeProfile": "Complete your farm profile",
       "setUpDelivery": "Set up delivery",
-      "loadFailed": "Some figures couldn't be loaded. Please refresh the page."
+      "loadFailed": "Some figures couldn't be loaded. Please refresh the page.",
+      "openAnalytics": "Open analytics"
     },
     "products": {
       "title": "Products",
@@ -740,14 +755,17 @@
   "paymentMethods": {
     "cash": "Cash",
     "bank_transfer": "Bank transfer",
+    "mobile_wallet": "Mobile wallet",
+    "cheque": "Cheque",
     "other": "Other"
   },
   "invoiceStatus": {
     "draft": "Draft",
-    "issued": "Issued",
+    "issued": "Unpaid",
     "partially_paid": "Partly paid",
     "paid": "Paid",
-    "void": "Void"
+    "cancelled": "Cancelled",
+    "refunded": "Refunded"
   },
   "restrictionNotices": {
     "listings": "An administrator has paused publishing for your account. You can still edit drafts, pause listings or mark them sold out. Contact us if you think this is a mistake.",
@@ -764,7 +782,10 @@
       "reference": "Locations & categories",
       "settings": "Settings",
       "logs": "Audit log",
-      "appeals": "Appeals"
+      "appeals": "Appeals",
+      "payments": "Payments",
+      "branding": "Branding studio",
+      "analytics": "Analytics"
     },
     "common": {
       "search": "Search",
@@ -867,11 +888,11 @@
         },
         "productViews": {
           "label": "Product views",
-          "help": "Product pages opened in the period, counted once per browser session."
+          "help": "Product pages opened in the period (each visitor once per product per day). Counting started with the current analytics; ranges longer than a year show the last 366 days."
         },
         "visits": {
           "label": "Website visits",
-          "help": "Browser sessions that opened the site in the period. Counting started when visit tracking was added."
+          "help": "Visits (sessions) in the period: a visit ends after 30 minutes without activity. Counting started with the current analytics; ranges longer than a year show the last 366 days."
         },
         "enquiries": {
           "label": "Enquiries",
@@ -914,7 +935,8 @@
       "expiredSuspensions": "{count} suspensions have ended but haven't been lifted yet (they lift automatically when the person signs in).",
       "liftNow": "Lift ended suspensions",
       "lifted": "{count} suspensions lifted.",
-      "allClear": "Nothing is waiting for review."
+      "allClear": "Nothing is waiting for review.",
+      "openAnalytics": "Open analytics"
     },
     "users": {
       "farmersTitle": "Farmers",
@@ -1232,7 +1254,9 @@
         "reference_manage": "Manage categories, units and islands",
         "settings_manage": "Change platform settings",
         "payments_verify": "Verify recorded payments",
-        "logs_view": "Read the audit log"
+        "logs_view": "Read the audit log",
+        "branding_manage": "Change the site's branding, homepage and settings",
+        "analytics_view": "View marketplace analytics (totals only)"
       },
       "appeals": "Appeals",
       "appealsHelp": "Whether users can appeal warnings, restrictions, suspensions and blocks from their account notices.",
@@ -1312,6 +1336,195 @@
       "reasonLabel": "Category",
       "detailsLabel": "What happened",
       "created": "Moderation record created."
+    },
+    "payments": {
+      "title": "Payment verification",
+      "intro": "Transfers farmers recorded with a slip or reference. Check them against the bank or wallet record before verifying.",
+      "empty": "Nothing waiting for verification.",
+      "invoice": "Invoice",
+      "farm": "Farm",
+      "verify": "Verify",
+      "verifyBody": "Confirm you've checked the slip or reference against the bank or wallet record. This is recorded in the audit log.",
+      "reject": "Reject",
+      "rejectBody": "Reject this payment? It stops counting towards the amount paid. The farmer sees the status.",
+      "verified": "Payment verified.",
+      "rejected": "Payment rejected.",
+      "noEvidence": "No slip or reference — this can't be verified.",
+      "viewSlip": "View slip",
+      "reverse": "Reverse entry",
+      "reverseBody": "Reverse this ledger entry? It stays on record and stops counting.",
+      "reversed": "Entry reversed."
+    },
+    "branding": {
+      "nav": "Branding studio",
+      "title": "Branding studio",
+      "intro": "Change how the website looks and what the homepage says. Save a draft, preview it, then publish. Visitors only ever see the published version.",
+      "status": {
+        "published": "Published version {version} · {date}",
+        "neverPublished": "Using the built-in design (nothing published yet).",
+        "draft": "You have an unpublished draft (saved {date}).",
+        "noDraft": "No draft — you're editing a copy of the published version.",
+        "restoredFrom": "This draft was restored from version {version}."
+      },
+      "tabs": {
+        "identity": "Name & logo",
+        "theme": "Colours & style",
+        "home": "Homepage",
+        "footer": "Footer & contact",
+        "languages": "Languages & SEO",
+        "history": "History"
+      },
+      "actions": {
+        "save": "Save draft",
+        "saved": "Draft saved. Preview it, then publish when ready.",
+        "preview": "Preview draft",
+        "previewHint": "Save the draft first; the preview shows the last saved draft.",
+        "publish": "Publish",
+        "publishBody": "Publish the saved draft? Everyone will see it straight away. The current version is kept in History.",
+        "publishNote": "Note for the history (optional)",
+        "published": "Published. The website now uses these settings.",
+        "discard": "Discard draft",
+        "discardBody": "Throw away the draft? The published version isn't affected.",
+        "discarded": "Draft discarded.",
+        "viewLive": "Open the live site"
+      },
+      "fields": {
+        "en": "English",
+        "dv": "Dhivehi",
+        "blankDefault": "Leave blank to use the built-in text.",
+        "siteName": "Website name",
+        "tagline": "Tagline",
+        "logo": "Logo",
+        "logoHint": "PNG, JPEG or WebP, up to 2 MB. Shown at about 36 px high.",
+        "favicon": "Favicon",
+        "faviconHint": "Square PNG or ICO, up to 256 KB.",
+        "upload": "Upload",
+        "remove": "Remove",
+        "uploading": "Uploading…",
+        "imageBad": "Use a PNG, JPEG or WebP image up to the size limit. SVG isn't allowed.",
+        "colors": "Colours",
+        "primary": "Primary (buttons, banners)",
+        "secondary": "Secondary (section backgrounds)",
+        "accent": "Accent",
+        "background": "Page background",
+        "text": "Text",
+        "contrast": "Contrast {ratio}:1",
+        "contrastOk": "readable",
+        "contrastLow": "too low — needs 4.5:1",
+        "typography": "Typography",
+        "font": "Body font",
+        "headingFont": "Heading font",
+        "headingWeight": "Heading weight",
+        "fonts": {
+          "inter": "Inter (default)",
+          "system": "System font",
+          "serif": "Serif"
+        },
+        "weights": {
+          "600": "Semibold",
+          "700": "Bold",
+          "800": "Extra bold"
+        },
+        "components": "Buttons and cards",
+        "buttonStyle": "Button shape",
+        "buttonStyles": {
+          "square": "Square",
+          "rounded": "Rounded",
+          "pill": "Pill"
+        },
+        "cardStyle": "Card style",
+        "cardStyles": {
+          "flat": "Flat",
+          "rounded": "Rounded",
+          "soft": "Soft shadow"
+        },
+        "sample": "Sample",
+        "sampleButton": "Button",
+        "hero": "Hero",
+        "heroTitle": "Hero title",
+        "heroSubtitle": "Hero subtitle",
+        "heroImage": "Hero image",
+        "heroImageHint": "Wide photo, PNG, JPEG or WebP up to 2 MB.",
+        "primaryCta": "Main button",
+        "secondaryCta": "Second button (optional)",
+        "ctaLabel": "Label",
+        "ctaHref": "Link (a page on this site, e.g. /products)",
+        "sections": "Homepage sections",
+        "sectionsHint": "Show, hide and reorder sections.",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "visible": "Show",
+        "sectionNames": {
+          "categories": "Categories",
+          "featured": "Featured products",
+          "recent": "Recently added",
+          "farms": "Featured farms",
+          "islands": "Browse by island",
+          "how": "How it works",
+          "promos": "Promotions",
+          "register": "Register as a farmer"
+        },
+        "featuredCategories": "Featured categories",
+        "featuredCategoriesHint": "Choose which categories the homepage shows. None selected: categories with products.",
+        "promos": "Promotions (up to 3)",
+        "addPromo": "Add promotion",
+        "promoTitle": "Title",
+        "promoBody": "Text",
+        "promoImage": "Image",
+        "promoLink": "Link (optional)",
+        "linkLabel": "Link text",
+        "linkHref": "Link (https://… or a page on this site)",
+        "richHint": "Plain text. Blank line = new paragraph, **bold**, [link text](https://example.mv).",
+        "footerAbout": "About text",
+        "footerLinks": "Footer links (up to 8)",
+        "addLink": "Add link",
+        "contactEmail": "Contact email",
+        "contactPhone": "Contact phone (+960…)",
+        "address": "Address",
+        "social": "Social links",
+        "addSocial": "Add social link",
+        "platform": "Platform",
+        "url": "Profile address (https://…)",
+        "languages": "Languages",
+        "defaultLanguage": "Default language",
+        "enabledLanguages": "Languages offered",
+        "seo": "Search and sharing",
+        "seoTitle": "Home page title",
+        "seoDescription": "Description",
+        "shareImage": "Sharing image",
+        "shareImageHint": "Shown when the site is shared on social media. 1200 × 630 recommended.",
+        "notInStudio": "Admin roles, sign-in, payment verification and other security settings are managed elsewhere and can't be changed here."
+      },
+      "errors": {
+        "title": "Fix these before saving:",
+        "invalid_color": "Use a colour like #15803d",
+        "low_contrast_text": "Text colour is hard to read on the background",
+        "low_contrast_primary": "White text is hard to read on the primary colour",
+        "invalid_link": "Use https://… or a page on this site (/…)",
+        "invalid_internal_link": "Use a page on this site, starting with /",
+        "invalid_social_link": "Use the platform's own https address",
+        "unsafe_link": "One of the links in the text isn't allowed (https or /… only)",
+        "invalid_image": "Image missing or not allowed — upload it again",
+        "default_not_enabled": "The default language must be one of the languages offered",
+        "duplicate_section": "Each section can appear once",
+        "required": "Required",
+        "invalid_phone": "Use +960 and 7 digits",
+        "other": "Not valid"
+      },
+      "history": {
+        "title": "Published versions",
+        "empty": "Nothing published yet.",
+        "version": "Version {number}",
+        "by": "{date} · {name}",
+        "restore": "Restore to draft",
+        "restoreBody": "Copy this version into the draft? Review it in the preview, then publish to make it live.",
+        "restored": "Version copied into the draft."
+      },
+      "preview": {
+        "banner": "Preview of the saved draft — not published. Visitors don't see this.",
+        "back": "Back to the studio",
+        "noDraft": "There's no saved draft to preview."
+      }
     }
   },
   "accountReports": {
@@ -1378,5 +1591,316 @@
     "failed": "Couldn't load your notices. Please try again.",
     "signOut": "Sign out",
     "contact": "Contact us"
+  },
+  "paymentStatus": {
+    "recorded": "Recorded by seller",
+    "pending_verification": "Pending verification",
+    "verified": "Verified by FarmConnect",
+    "rejected": "Rejected",
+    "reversed": "Reversed"
+  },
+  "ledgerKinds": {
+    "payment": "Payment",
+    "refund": "Refund",
+    "reversal": "Correction (reversal)"
+  },
+  "orderStatus": {
+    "pending": "Pending",
+    "confirmed": "Agreed",
+    "delivered": "Delivered",
+    "cancelled": "Cancelled"
+  },
+  "finance": {
+    "invoice": "Invoice",
+    "receipt": "Receipt",
+    "invoiceNo": "Invoice no.",
+    "receiptNo": "Receipt no.",
+    "draft": "Draft (not yet issued)",
+    "seller": "From",
+    "buyer": "Bill to",
+    "issueDate": "Issue date",
+    "dueDate": "Due date",
+    "item": "Item",
+    "qty": "Qty",
+    "unit": "Unit",
+    "unitPrice": "Unit price",
+    "amount": "Amount",
+    "subtotal": "Subtotal",
+    "discount": "Discount",
+    "delivery": "Delivery fee",
+    "total": "Total",
+    "paid": "Amount paid",
+    "refunded": "Refunded",
+    "outstanding": "Outstanding balance",
+    "terms": "Payment terms",
+    "notes": "Notes",
+    "status": "Status",
+    "currencyNote": "All amounts are in Maldivian rufiyaa (MVR).",
+    "noTax": "No tax has been charged on this invoice.",
+    "disclaimer": "FarmConnect doesn't process payments. Payments are made directly between the buyer and the seller and recorded by the seller.",
+    "print": "Print",
+    "downloadPdf": "Download PDF",
+    "payments": "Payments",
+    "noPayments": "No payments recorded yet.",
+    "paymentDate": "Payment date",
+    "method": "Method",
+    "reference": "Reference",
+    "kind": "Type",
+    "pendingNote": "{amount} of this awaits verification by FarmConnect.",
+    "verifiedNote": "{amount} verified by FarmConnect.",
+    "receiptFor": "For invoice {number}",
+    "receiptStatus": "Payment status",
+    "receivedFrom": "Received from",
+    "paidTo": "Paid to",
+    "refundTo": "Refunded to",
+    "reversedNote": "This payment was reversed and no longer counts.",
+    "back": "Back"
+  },
+  "sales": {
+    "nav": "Sales & invoices",
+    "title": "Sales & invoices",
+    "intro": "Agreed transactions, invoices and the payments you've received.",
+    "new": "New transaction",
+    "empty": "No transactions yet",
+    "emptyBody": "Create one from an accepted enquiry, or for a buyer you deal with directly.",
+    "fromEnquiry": "Create transaction",
+    "newTitle": "New transaction",
+    "buyer": "Buyer",
+    "linkedBuyer": "From the enquiry by {name}",
+    "buyerName": "Buyer's name",
+    "buyerPhone": "Buyer's phone (optional)",
+    "items": "Items",
+    "addItem": "Add item",
+    "removeItem": "Remove",
+    "product": "Product",
+    "otherItem": "Something else (type a name)",
+    "itemName": "Item name",
+    "quantity": "Quantity",
+    "unit": "Unit",
+    "unitPrice": "Agreed price per unit (MVR)",
+    "discount": "Discount (MVR)",
+    "deliveryFee": "Delivery fee (MVR)",
+    "total": "Total",
+    "notes": "Notes (optional)",
+    "create": "Save transaction",
+    "snapshotNote": "Names and prices are saved as agreed. Later changes to your listings won't change this record.",
+    "orderTitle": "Transaction",
+    "agreed": "Agreed {date}",
+    "markDelivered": "Mark delivered",
+    "markDeliveredBody": "Mark this transaction as delivered?",
+    "delivered": "Marked delivered.",
+    "cancelOrder": "Cancel transaction",
+    "cancelOrderBody": "Cancel this transaction? Only possible while it has no issued invoice with payments. It stays on record.",
+    "orderCancelled": "Transaction cancelled.",
+    "invoice": "Invoice",
+    "noInvoice": "No invoice yet.",
+    "createInvoice": "Create invoice",
+    "dueDate": "Due date (optional)",
+    "paymentTerms": "Payment terms (optional)",
+    "paymentTermsHint": "For example: \"Pay within 7 days by bank transfer to account …\"",
+    "invoiceNotes": "Notes on the invoice (optional)",
+    "invoiceCreated": "Draft invoice created.",
+    "issue": "Issue invoice",
+    "issueBody": "Issue this invoice? It gets a unique number and its lines can't be changed afterwards.",
+    "issued": "Invoice issued.",
+    "cancelInvoice": "Cancel invoice",
+    "cancelInvoiceBody": "Cancel this invoice? Only possible before any payment is recorded. It stays on record.",
+    "invoiceCancelled": "Invoice cancelled.",
+    "view": "View / print",
+    "recordPayment": "Record payment",
+    "recordRefund": "Record refund",
+    "amount": "Amount (MVR)",
+    "method": "Method",
+    "paymentDate": "Payment date",
+    "reference": "Reference (optional)",
+    "proof": "Transfer slip (optional)",
+    "proofHint": "Photo or PDF, up to 5 MB. Transfers with a slip or reference can be verified by FarmConnect.",
+    "paymentNotes": "Note (optional)",
+    "paymentRecorded": "Payment recorded. A receipt was created.",
+    "refundRecorded": "Refund recorded.",
+    "reverse": "Reverse",
+    "reverseBody": "Reverse this entry? It stays on record, marked as reversed, and stops counting towards the amount paid.",
+    "reversedDone": "Entry reversed.",
+    "ledger": "Payment ledger",
+    "receipt": "Receipt",
+    "outstanding": "Outstanding",
+    "proofLink": "Slip",
+    "errors": {
+      "not_found": "That record no longer exists.",
+      "forbidden": "You can't change this record.",
+      "invalid_input": "Please check the amounts and fields.",
+      "invalid_state": "That isn't possible in the record's current state. Refresh the page.",
+      "overpayment": "That's more than the outstanding balance.",
+      "refund_exceeds_paid": "A refund can't be more than the amount paid.",
+      "discount_exceeds_subtotal": "The discount can't be more than the subtotal.",
+      "already_invoiced": "This transaction already has an invoice.",
+      "enquiry_not_accepted": "Accept the enquiry first, then create the transaction.",
+      "proof_invalid": "The slip couldn't be accepted. Upload a JPEG, PNG, WebP or PDF up to 5 MB.",
+      "account_inactive": "Your account can't record sales right now.",
+      "failed": "Something went wrong. Nothing was saved. Please try again."
+    }
+  },
+  "analytics": {
+    "title": "Analytics",
+    "intro": "How people find and use FarmConnect. Website activity is counted on the server from checked, de-duplicated events; enquiries, registrations, invoices, payments and reports come from the platform's own records.",
+    "farmerIntro": "How buyers find your listings. Only your own listings and farm page are included.",
+    "range": "Period",
+    "ranges": {
+      "today": "Today",
+      "7d": "Last 7 days",
+      "30d": "Last 30 days",
+      "custom": "Custom dates"
+    },
+    "from": "From",
+    "to": "To",
+    "period": "Showing {from} – {to} (Maldives time).",
+    "clamped": "Custom periods are limited to 366 days, so only the last 366 days of your dates are shown.",
+    "loadFailed": "Some figures couldn't be loaded. Please refresh the page.",
+    "estimate": "≈ {value}",
+    "countAndTotal": "{count} · {amount}",
+    "sections": {
+      "traffic": "Website traffic",
+      "marketplace": "Marketplace activity",
+      "money": "Invoices and payment records",
+      "safety": "Reports and moderation",
+      "trends": "Trends",
+      "products": "Most viewed products",
+      "categories": "Popular categories",
+      "islands": "Popular islands",
+      "atolls": "Atoll filters",
+      "reasons": "Reports by reason",
+      "enforcement": "Moderation actions by type",
+      "definitions": "How these figures are counted",
+      "yourListings": "Your listings",
+      "popularProducts": "Your popular products"
+    },
+    "metrics": {
+      "visitors": {
+        "label": "Unique visitors",
+        "help": "Different browsers that opened the site that day. Refreshing or coming back doesn't add a visitor; a new device, a private window or cleared browser data does.",
+        "helpRange": "Different browsers over the whole period, estimated (usually within about 2%). A visitor who came on several days counts once."
+      },
+      "sessions": {
+        "label": "Visits (sessions)",
+        "help": "A visit ends after 30 minutes without activity, or at midnight Maldives time."
+      },
+      "pageViews": {
+        "label": "Page views",
+        "help": "Public pages shown, including refreshes. Admin, farmer and account pages aren't counted."
+      },
+      "productViews": {
+        "label": "Product views",
+        "help": "Product pages opened. The same visitor opening the same product again that day counts once."
+      },
+      "farmerViews": {
+        "label": "Farm profile views",
+        "help": "Farm pages opened. The same visitor opening the same farm again that day counts once."
+      },
+      "searches": {
+        "label": "Product searches",
+        "help": "Searches with words ({none} found nothing). The same words from the same visitor count once a day. Search words aren't stored."
+      },
+      "filterUses": {
+        "label": "Category and island filter uses",
+        "help": "Category, atoll or island filters applied on the product list, or a category page opened. Once per visitor, filter and day."
+      },
+      "contactClicks": {
+        "label": "Contact clicks",
+        "help": "A click opens the buyer's phone or chat app. It doesn't mean a message was sent or delivered, or that a sale happened."
+      },
+      "byChannel": "Call {call} · WhatsApp {whatsapp} · Viber {viber}.",
+      "enquiries": {
+        "label": "Enquiries",
+        "help": "Enquiries buyers successfully sent through the site, counted from the enquiry records."
+      },
+      "activeFarmers": {
+        "label": "Active farmers",
+        "help": "Farmers with at least one live listing right now."
+      },
+      "farmersWithEnquiries": {
+        "label": "Farmers who received enquiries",
+        "help": "Different farmers who received at least one enquiry in the period."
+      },
+      "newFarmers": {
+        "label": "Farmer registrations",
+        "help": "Farmer accounts created in the period."
+      },
+      "newConsumers": {
+        "label": "Buyer registrations",
+        "help": "Buyer accounts created in the period."
+      },
+      "invoices": {
+        "label": "Invoices issued (recorded)",
+        "help": "Invoices farmers issued in the period, excluding drafts and cancelled ones ({cancelled} cancelled): how many and their total. These are farmers' records, not verified sales."
+      },
+      "payments": {
+        "label": "Payment records created",
+        "help": "Payments recorded on the platform in the period, by the date they were recorded. FarmConnect doesn't process payments; a record isn't proof of payment."
+      },
+      "paymentsVerified": {
+        "label": "Verified by an administrator",
+        "help": "Part of the recorded payments an administrator verified with evidence. Awaiting verification: {pending}. Rejected: {rejected}."
+      },
+      "refunds": {
+        "label": "Refunds recorded",
+        "help": "Refunds recorded in the period. Corrections (reversed entries): {reversals}."
+      },
+      "reportsOpened": {
+        "label": "Reports received",
+        "help": "Reports submitted in the period."
+      },
+      "reportsClosed": {
+        "label": "Reports closed",
+        "help": "Reports resolved or dismissed in the period."
+      },
+      "reportsOpenNow": {
+        "label": "Reports open now",
+        "help": "Open, under review or waiting for information."
+      }
+    },
+    "trends": {
+      "visitors": "Unique visitors per day",
+      "pageViews": "Page views per day",
+      "productViews": "Product views per day",
+      "profileViews": "Farm profile views per day",
+      "contactClicks": "Contact clicks per day",
+      "enquiries": "Enquiries per day",
+      "farmers": "Farmer registrations per day",
+      "consumers": "Buyer registrations per day",
+      "reportsOpened": "Reports received per day"
+    },
+    "chart": {
+      "showTable": "Show as a table",
+      "day": "Day",
+      "total": "Total {count}"
+    },
+    "table": {
+      "product": "Product",
+      "category": "Category",
+      "island": "Island",
+      "atoll": "Atoll",
+      "views": "Views",
+      "clicks": "Contact clicks",
+      "enquiries": "Enquiries",
+      "filterUses": "Filter uses",
+      "reason": "Reason",
+      "type": "Type",
+      "count": "Count",
+      "none": "Nothing in this period.",
+      "deleted": "Listing no longer available"
+    },
+    "definitions": [
+      "Days are calendar days in Maldives time (UTC+5).",
+      "Visitors are counted per browser with a random id kept in that browser. It isn't a cookie and isn't linked to an account. No individual visits, search words or addresses are stored — only daily totals.",
+      "Administrators' own browsing isn't counted, and farmers' views and clicks on their own listings aren't either.",
+      "Counting started when this version of analytics went live; earlier activity isn't included.",
+      "Invoice and payment figures are what users recorded. Only administrator-verified payments have been checked against evidence."
+    ],
+    "farmerDefinitions": [
+      "Days are calendar days in Maldives time (UTC+5).",
+      "A visitor opening the same listing or your farm page several times in a day counts once. Your own visits aren't counted.",
+      "Contact clicks mean a buyer's phone or chat app was opened, not that they reached you or bought anything.",
+      "Enquiries are counted from the enquiries buyers actually sent."
+    ]
   }
 }

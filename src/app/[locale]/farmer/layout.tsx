@@ -18,6 +18,8 @@ export default async function FarmerLayout({
         { href: href("/farmer"), label: t.dashboard, exact: true },
         { href: href("/farmer/products"), label: t.products },
         { href: href("/farmer/enquiries"), label: t.enquiries },
+        { href: href("/farmer/sales"), label: dict.sales.nav },
+        { href: href("/farmer/analytics"), label: t.analytics },
         { href: href("/farmer/delivery"), label: t.delivery },
         { href: href("/farmer/profile"), label: t.profile },
       ]}

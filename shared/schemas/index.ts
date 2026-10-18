@@ -11,4 +11,6 @@ export * from "./order";
 export * from "./invoice";
 export * from "./payment";
 export * from "./site";
+export * from "./analytics";
+export * from "./branding";
 export * from "./admin";

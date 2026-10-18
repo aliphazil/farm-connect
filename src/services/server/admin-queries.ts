@@ -41,6 +41,7 @@ import {
   type UserAccount,
 } from "@shared/schemas";
 import { getAdminAuth, getAdminDb } from "@/lib/firebase/admin";
+import { getTrafficTotals } from "./analytics";
 import { BOOTSTRAP_ACTOR, col, snapToModel } from "./db";
 
 /**
@@ -162,12 +163,6 @@ function inRange(q: Query, field: string, range: DateRange): Query {
 export async function getAdminStats(range: DateRange): Promise<AdminStats> {
   const users = col(COLLECTIONS.users);
   const products = col(COLLECTIONS.products);
-  const events = (type: string) =>
-    inRange(
-      col(COLLECTIONS.siteEvents).where("type", "==", type),
-      "createdAt",
-      range,
-    );
 
   const [
     total,
@@ -179,10 +174,8 @@ export async function getAdminStats(range: DateRange): Promise<AdminStats> {
     productTotal,
     productActive,
     pendingReview,
-    productViews,
-    visits,
+    traffic,
     enquiries,
-    contactClicks,
     reportsAwaiting,
     invoices,
     payments,
@@ -208,10 +201,9 @@ export async function getAdminStats(range: DateRange): Promise<AdminStats> {
     safe(() => count(products)),
     safe(() => count(products.where("isPublic", "==", true))),
     safe(() => count(products.where("moderation", "==", "pending"))),
-    safe(() => count(events("product_view"))),
-    safe(() => count(events("page_view"))),
+    // Website activity comes from the analytics counters.
+    safe(() => getTrafficTotals(range)),
     safe(() => count(inRange(col(COLLECTIONS.enquiries), "createdAt", range))),
-    safe(() => count(events("contact_click"))),
     safe(() =>
       count(
         col(COLLECTIONS.reports).where("status", "in", ["open", "reviewing"]),
@@ -238,10 +230,14 @@ export async function getAdminStats(range: DateRange): Promise<AdminStats> {
     }),
     safe(async () => {
       const d = (
-        await inRange(col(COLLECTIONS.payments), "receivedAt", range)
+        await inRange(
+          col(COLLECTIONS.payments).where("kind", "==", "payment"),
+          "receivedAt",
+          range,
+        )
           .aggregate({
             n: AggregateField.count(),
-            total: AggregateField.sum("amountLaari"),
+            total: AggregateField.sum("effectiveLaari"),
           })
           .get()
       ).data();
@@ -251,15 +247,13 @@ export async function getAdminStats(range: DateRange): Promise<AdminStats> {
       async () =>
         (
           await inRange(
-            col(COLLECTIONS.payments).where(
-              "verificationStatus",
-              "==",
-              "verified",
-            ),
+            col(COLLECTIONS.payments)
+              .where("kind", "==", "payment")
+              .where("verificationStatus", "==", "verified"),
             "receivedAt",
             range,
           )
-            .aggregate({ total: AggregateField.sum("amountLaari") })
+            .aggregate({ total: AggregateField.sum("effectiveLaari") })
             .get()
         ).data().total,
     ),
@@ -278,10 +272,10 @@ export async function getAdminStats(range: DateRange): Promise<AdminStats> {
     users: { total, farmers, consumers, admins, newInRange },
     farmersPending,
     products: { total: productTotal, active: productActive, pendingReview },
-    productViews,
-    visits,
+    productViews: traffic?.productViews ?? null,
+    visits: traffic?.sessions ?? null,
     enquiries,
-    contactClicks,
+    contactClicks: traffic?.contactClicks ?? null,
     reportsAwaiting,
     invoices: invoices ?? { count: null, totalLaari: null },
     payments: {

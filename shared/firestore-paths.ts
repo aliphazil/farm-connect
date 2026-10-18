@@ -36,11 +36,26 @@ export const COLLECTIONS = {
   invoices: "invoices",
   payments: "payments",
   receipts: "receipts",
+  /** Server-only: per-farmer invoice/receipt sequence counters. */
+  financeCounters: "financeCounters",
+  /** Server-only: one doc per issued document number (global uniqueness guard). */
+  documentNumbers: "documentNumbers",
   siteSettings: "siteSettings",
   siteContent: "siteContent",
+  /** Legacy raw usage events (before Phase 10); no longer written. */
   siteEvents: "siteEvents",
+  /** Daily counters: `{day}` with `shards/{n}` and `hll/{n}` (server only). */
   analyticsDaily: "analyticsDaily",
+  /** Per-product and per-farm daily counters (server only). */
+  analyticsProductDaily: "analyticsProductDaily",
+  analyticsFarmerDaily: "analyticsFarmerDaily",
+  /** Short-lived duplicate markers, removed by a TTL policy (server only). */
+  analyticsMarks: "analyticsMarks",
   adminLogs: "adminLogs",
+  /** Branding Studio: the working draft (admins only). */
+  brandingDrafts: "brandingDrafts",
+  /** Every published branding version (admins only). */
+  brandingVersions: "brandingVersions",
 } as const;
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];

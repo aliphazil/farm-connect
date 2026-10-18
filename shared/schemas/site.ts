@@ -99,9 +99,9 @@ export const SITE_EVENT_TYPES = [
 export type SiteEventType = (typeof SITE_EVENT_TYPES)[number];
 
 /**
- * `siteEvents/{auto}` — raw, anonymous usage events. Create-only from
- * clients (strictly validated by rules); readable only by admins. Contains no
- * personal data beyond the optional uid of a signed-in user.
+ * `siteEvents/{auto}` — legacy raw usage events written by browsers before
+ * Phase 10. No longer written (rules refuse new ones); kept for admins.
+ * Analytics now go through /api/events (see ./analytics.ts).
  */
 export const siteEventSchema = z.object({
   id: idSchema,
@@ -116,15 +116,3 @@ export const siteEventSchema = z.object({
   createdAt: z.date(),
 });
 export type SiteEvent = z.infer<typeof siteEventSchema>;
-
-/** `analyticsDaily/{YYYY-MM-DD}` — aggregated counts written by server code. */
-export const analyticsDailySchema = z.object({
-  id: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  counts: z.record(z.enum(SITE_EVENT_TYPES), z.number().int().nonnegative()),
-  newUsers: z.number().int().nonnegative(),
-  newProducts: z.number().int().nonnegative(),
-  enquiries: z.number().int().nonnegative(),
-  updatedAt: z.date(),
-});
-export type AnalyticsDaily = z.infer<typeof analyticsDailySchema>;

@@ -14,6 +14,7 @@ describe("admin levels", () => {
   it("moderators review and moderate but can't block, change roles, feature, or edit settings/reference data", () => {
     expect(LEVEL_PERMISSIONS.moderator).toEqual([
       "admin.view",
+      "analytics.view",
       "farmers.approve",
       "users.moderate",
       "products.moderate",
@@ -25,6 +26,7 @@ describe("admin levels", () => {
       "products.feature",
       "reference.manage",
       "settings.manage",
+      "branding.manage",
       "payments.verify",
       "logs.view",
     ] as const)

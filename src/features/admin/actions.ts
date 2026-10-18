@@ -7,17 +7,17 @@ import type {
 } from "@shared/constants/admin";
 import type { SelfServiceRole } from "@shared/constants/roles";
 import type {
-  BrandingInput,
   FarmerApprovalStatus,
   IslandInput,
-  PaymentVerification,
   ProductModeration,
   ReferenceLabelInput,
   ReportReason,
   ReportStatus,
+  SiteConfigInput,
 } from "@shared/schemas";
 import { AuthorizationError, assertAdminPermission } from "@/lib/auth/session";
 import * as admin from "@/services/server/admin";
+import * as branding from "@/services/server/branding";
 
 /**
  * Server Actions for the admin portal. Each one re-verifies the session and
@@ -182,15 +182,21 @@ export async function updateReportAction(
 
 export async function verifyPaymentAction(
   paymentId: string,
-  status: Exclude<PaymentVerification, "unverified">,
+  status: "verified" | "rejected",
+  note?: string,
 ) {
   return run("payments.verify", (a) =>
-    admin.verifyPayment(a, paymentId, status),
+    admin.verifyPayment(a, paymentId, status, note),
   );
 }
 
-export async function publishBrandingAction(input: BrandingInput) {
-  return run("settings.manage", (a) => admin.publishBranding(a, input));
+export async function reverseLedgerEntryAction(
+  paymentId: string,
+  reason: string,
+) {
+  return run("payments.verify", (a) =>
+    admin.reverseLedgerEntry(a, paymentId, reason),
+  );
 }
 
 export async function setModerationSettingsAction(
@@ -309,4 +315,65 @@ export async function createInternalReportAction(input: {
   details: string;
 }) {
   return run("reports.manage", (a) => admin.createInternalReport(a, input));
+}
+
+// ---------- branding studio ----------
+
+async function runBranding(
+  work: (actor: branding.BrandingActor) => Promise<unknown>,
+  publishes = false,
+): Promise<
+  | AdminActionResult
+  | {
+      ok: false;
+      error: "invalid_input";
+      issues: { path: string; message: string }[];
+    }
+> {
+  try {
+    const user = await assertAdminPermission("branding.manage");
+    const value = await work({
+      uid: user.uid,
+      role: user.role,
+      adminLevel: user.adminLevel,
+    });
+    if (publishes) updateTag("branding");
+    return { ok: true, ...(typeof value === "number" ? { count: value } : {}) };
+  } catch (error) {
+    if (error instanceof AuthorizationError)
+      return { ok: false, error: "unauthorized" };
+    if (error instanceof branding.BrandingError) {
+      if (error.code === "invalid_input")
+        return { ok: false, error: "invalid_input", issues: error.issues };
+      return {
+        ok: false,
+        error:
+          error.code === "invalid_image"
+            ? "invalid_input"
+            : error.code === "no_draft"
+              ? "invalid_state"
+              : error.code === "conflict"
+                ? "invalid_state"
+                : error.code,
+      };
+    }
+    console.error("Branding action failed", error);
+    return { ok: false, error: "failed" };
+  }
+}
+
+export async function saveBrandingDraftAction(config: SiteConfigInput) {
+  return runBranding((a) => branding.saveDraft(a, config));
+}
+
+export async function publishBrandingAction(note?: string) {
+  return runBranding((a) => branding.publishDraft(a, note), true);
+}
+
+export async function restoreBrandingVersionAction(versionId: string) {
+  return runBranding((a) => branding.restoreVersion(a, versionId));
+}
+
+export async function discardBrandingDraftAction() {
+  return runBranding((a) => branding.discardDraft(a));
 }

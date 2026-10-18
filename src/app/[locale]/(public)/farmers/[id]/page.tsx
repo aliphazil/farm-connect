@@ -135,9 +135,7 @@ export default async function FarmerProfilePage({
                 contact={farmer.contact}
                 labels={contactLabels(dict)}
                 message={name}
-                track={
-                  isSampleCatalog ? undefined : { locale, farmerId: farmer.id }
-                }
+                track={isSampleCatalog ? undefined : { farmerId: farmer.id }}
               />
             </div>
             <div>
@@ -158,7 +156,7 @@ export default async function FarmerProfilePage({
         </div>
 
         {isSampleCatalog ? null : (
-          <TrackView type="farmer_view" locale={locale} farmerId={farmer.id} />
+          <TrackView type="farmer_view" farmerId={farmer.id} />
         )}
         <Section id="farm-products" title={dict.farmers.products}>
           {listings.length === 0 ? (

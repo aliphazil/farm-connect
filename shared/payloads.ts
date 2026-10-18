@@ -16,14 +16,11 @@ import {
   type FarmerProfile,
   type FarmerProfileUpdate,
   type FraudReportInput,
-  type ContactChannel,
   type FavouriteTarget,
   type Product,
   type ProductInput,
-  type SiteEventType,
   type UserSelfUpdate,
 } from "./schemas";
-import type { Locale } from "./constants/locales";
 
 /**
  * Builders for every document a client (web or mobile) may write directly.
@@ -175,25 +172,5 @@ export function buildReportCreate<T>(
     status: "open" as const,
     createdAt: now,
     updatedAt: now,
-  });
-}
-
-export function buildSiteEvent<T>(
-  event: {
-    type: SiteEventType;
-    locale: Locale;
-    path?: string;
-    productId?: string;
-    farmerId?: string;
-    channel?: ContactChannel;
-  },
-  uid: string | undefined,
-  now: T,
-) {
-  return compact({
-    ...event,
-    path: event.path?.slice(0, 200),
-    uid,
-    createdAt: now,
   });
 }

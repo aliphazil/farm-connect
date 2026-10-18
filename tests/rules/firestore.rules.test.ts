@@ -27,7 +27,6 @@ import {
   buildProductCreate,
   buildProductUpdate,
   buildReportCreate,
-  buildSiteEvent,
   buildUserUpdate,
 } from "@shared/payloads";
 import { productDerivedFields } from "@shared/schemas";
@@ -1090,80 +1089,51 @@ describe("admin-only and public reference data", () => {
   });
 });
 
-describe("siteEvents", () => {
-  it("accept well-formed anonymous events but nothing else", async () => {
-    const event = {
-      type: "page_view" as const,
-      locale: "en" as const,
-      path: "/en/products",
-    };
-    await assertSucceeds(
-      addDoc(
-        collection(asAnon(), "siteEvents"),
-        buildSiteEvent(event, undefined, serverTimestamp()),
-      ),
-    );
-    await assertSucceeds(
-      addDoc(
-        collection(asConsumerC(), "siteEvents"),
-        buildSiteEvent(event, "consumerC", serverTimestamp()),
-      ),
-    );
-    await assertFails(
-      addDoc(
-        collection(asConsumerC(), "siteEvents"),
-        buildSiteEvent(event, "farmerA", serverTimestamp()),
-      ),
-    );
+describe("analytics data", () => {
+  it("browsers can't write events or counters, or read them", async () => {
+    // Events go through /api/events; the legacy collection is closed to writes.
     await assertFails(
       addDoc(collection(asAnon(), "siteEvents"), {
-        ...buildSiteEvent(event, undefined, serverTimestamp()),
-        email: "x@y.mv",
+        type: "page_view",
+        locale: "en",
+        createdAt: serverTimestamp(),
       }),
     );
     await assertFails(
-      addDoc(collection(asAnon(), "siteEvents"), {
-        ...buildSiteEvent(event, undefined, serverTimestamp()),
-        type: "purchase",
+      addDoc(collection(asConsumerC(), "siteEvents"), {
+        type: "contact_click",
+        locale: "en",
+        channel: "whatsapp",
+        createdAt: serverTimestamp(),
       }),
     );
     await assertFails(getDocs(collection(asConsumerC(), "siteEvents")));
-  });
-
-  it("record contact clicks with a valid channel only", async () => {
-    const click = {
-      type: "contact_click" as const,
-      locale: "en" as const,
-      productId: "pA",
-      farmerId: "farmerA",
-    };
+    for (const path of [
+      "analyticsDaily/2026-10-01/shards/0",
+      "analyticsDaily/2026-10-01/hll/0",
+      "analyticsProductDaily/2026-10-01_pA",
+      "analyticsFarmerDaily/2026-10-01_farmerA",
+      "analyticsMarks/abc",
+    ]) {
+      await assertFails(setDoc(doc(asAnon(), path), { counts: { x: 1 } }));
+      await assertFails(setDoc(doc(asFarmerA(), path), { productViews: 999 }));
+      await assertFails(getDoc(doc(asFarmerA(), path)));
+      await assertFails(getDoc(doc(asConsumerC(), path)));
+    }
+    // A farmer can't read their own raw counters from the browser either;
+    // their analytics page reads them on the server, filtered by session.
+    await assertFails(
+      getDocs(
+        query(
+          collection(asFarmerA(), "analyticsFarmerDaily"),
+          where("farmerId", "==", "farmerA"),
+        ),
+      ),
+    );
     await assertSucceeds(
-      addDoc(
-        collection(asAnon(), "siteEvents"),
-        buildSiteEvent(
-          { ...click, channel: "whatsapp" },
-          undefined,
-          serverTimestamp(),
-        ),
-      ),
+      getDoc(doc(asAdmin(), "analyticsDaily/2026-10-01/shards/0")),
     );
-    await assertFails(
-      addDoc(collection(asAnon(), "siteEvents"), {
-        ...buildSiteEvent(click, undefined, serverTimestamp()),
-        channel: "email",
-      }),
-    );
-    // A channel only makes sense on a contact click.
-    await assertFails(
-      addDoc(
-        collection(asAnon(), "siteEvents"),
-        buildSiteEvent(
-          { type: "page_view", locale: "en", channel: "call" },
-          undefined,
-          serverTimestamp(),
-        ),
-      ),
-    );
+    await assertFails(getDoc(doc(asAdmin(), "analyticsMarks/abc")));
   });
 });
 
@@ -1486,6 +1456,37 @@ describe("admin phase: restrictions, suspension, listing review, location integr
         status: "active",
         updatedAt: serverTimestamp(),
       }),
+    );
+  });
+});
+
+describe("branding studio data", () => {
+  it("drafts and versions are admin-only; published branding is public; clients write none", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "brandingDrafts/current"), {
+        config: { identity: {} },
+      });
+      await setDoc(doc(db, "brandingVersions/000001"), {
+        number: 1,
+        config: {},
+      });
+    });
+    await assertSucceeds(getDoc(doc(asAdmin(), "brandingDrafts/current")));
+    await assertSucceeds(getDoc(doc(asAdmin(), "brandingVersions/000001")));
+    for (const db of [asAnon(), asConsumerC(), asFarmerA(), asMallory()]) {
+      await assertFails(getDoc(doc(db, "brandingDrafts/current")));
+      await assertFails(getDoc(doc(db, "brandingVersions/000001")));
+    }
+    await assertSucceeds(getDoc(doc(asAnon(), "siteSettings/branding")));
+    await assertFails(
+      setDoc(doc(asAdmin(), "brandingDrafts/current"), { config: {} }),
+    );
+    await assertFails(
+      setDoc(doc(asAdmin(), "siteSettings/branding"), { config: {} }),
+    );
+    await assertFails(
+      setDoc(doc(asAdmin(), "brandingVersions/000002"), { number: 2 }),
     );
   });
 });

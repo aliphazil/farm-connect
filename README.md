@@ -68,6 +68,12 @@ docs/                    firebase-setup.md, data-model.md, security.md
 - **Security Rules** deny by default and are tested on the emulator. Financial, moderation and
   configuration data are server-written only.
 - **Portal pages** each call their guard; **Server Actions / Route Handlers** call `assertRole()`.
+- **Branding Studio** (`/admin/branding`, owner admins only): edit, save a draft, preview, publish
+  and restore versions. Settings are validated (no HTML or scripts, safe links, contrast checks);
+  drafts are never public. Security settings and roles aren't part of it.
+- **Analytics** (`/admin/analytics`, `/farmer/analytics`): browsers post events to `/api/events`,
+  which validates, de-duplicates and aggregates them into daily counters; no raw events or visitor ids
+  are stored. Definitions are in `shared/schemas/analytics.ts`.
 - `NEXT_PUBLIC_FIREBASE_*` values are public by design. `FIREBASE_ADMIN_*` values are secrets.
 
 ## Conventions

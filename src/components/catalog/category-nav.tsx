@@ -19,16 +19,21 @@ export function CategoryNav({
   counts,
   current,
   label,
+  only,
 }: {
   locale: Locale;
   dict: Dictionary;
   counts?: Partial<Record<ProductCategory, number>>;
   current?: ProductCategory;
   label: string;
+  /** Show just these categories, in this order (homepage featured categories). */
+  only?: readonly ProductCategory[];
 }) {
-  const categories = counts
-    ? PRODUCT_CATEGORIES.filter((c) => (counts[c] ?? 0) > 0)
-    : PRODUCT_CATEGORIES;
+  const categories = only?.length
+    ? only
+    : counts
+      ? PRODUCT_CATEGORIES.filter((c) => (counts[c] ?? 0) > 0)
+      : PRODUCT_CATEGORIES;
   return (
     <nav
       aria-label={label}

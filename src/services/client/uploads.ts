@@ -118,3 +118,37 @@ export async function uploadReportEvidence(file: Blob): Promise<string> {
   await uploadBytes(ref(getClientStorage(), path), file, { contentType: type });
   return path;
 }
+
+/** A transfer slip for a payment the farmer is about to record. */
+export async function uploadPaymentProof(file: Blob): Promise<string> {
+  const type = file.type;
+  const ext =
+    type === "application/pdf" ? "pdf" : objectName(type).split(".").pop();
+  const slot = `${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
+  const path = storagePaths.paymentProof(
+    await requireUid(),
+    slot,
+    `slip.${ext}`,
+  );
+  await uploadBytes(ref(getClientStorage(), path), file, { contentType: type });
+  return path;
+}
+
+/** Branding Studio image (owner admins; Storage rules enforce type and size). */
+export async function uploadBrandingImage(file: Blob): Promise<string> {
+  const type = file.type;
+  const ext =
+    type === "image/png"
+      ? "png"
+      : type === "image/webp"
+        ? "webp"
+        : type === "image/x-icon" || type === "image/vnd.microsoft.icon"
+          ? "ico"
+          : "jpg";
+  // Make sure the signed-in user's token is attached (Storage rules check
+  // the owner-admin claim); otherwise the upload goes out anonymous.
+  await requireUid();
+  const path = `branding/uploads/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
+  await uploadBytes(ref(getClientStorage(), path), file, { contentType: type });
+  return path;
+}

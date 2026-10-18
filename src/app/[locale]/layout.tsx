@@ -1,9 +1,12 @@
+import { Suspense, type CSSProperties } from "react";
 import type { Metadata, Viewport } from "next";
 import { Inter, Noto_Sans_Thaana } from "next/font/google";
 import { LOCALE_DIRECTION, LOCALES } from "@shared/constants/locales";
-import { getDictionary, getLocale } from "@/i18n/server";
+import { getDictionary, getLocale, getSiteConfig } from "@/i18n/server";
+import { storageObjectUrl } from "@/features/catalog/images";
+import { themeVariables } from "@/lib/branding/theme";
 import { isSampleCatalog } from "@/features/catalog/queries";
-import { TrackVisit } from "@/components/catalog/track-visit";
+import { SiteAnalytics } from "@/components/catalog/site-analytics";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import "../globals.css";
@@ -24,34 +27,63 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata(): Promise<Metadata> {
-  const dict = await getDictionary();
+  const [locale, dict, config] = await Promise.all([
+    getLocale(),
+    getDictionary(),
+    getSiteConfig(),
+  ]);
+  const seoTitle = (
+    locale === "dv"
+      ? config.seo.title.dv || config.seo.title.en
+      : config.seo.title.en || config.seo.title.dv
+  ).trim();
+  const share = config.seo.shareImagePath
+    ? storageObjectUrl(config.seo.shareImagePath)
+    : undefined;
   return {
     title: {
-      default: dict.meta.siteName,
+      default: seoTitle || dict.meta.siteName,
       template: `%s · ${dict.meta.siteName}`,
     },
     description: dict.meta.description,
     alternates: {
-      languages: Object.fromEntries(LOCALES.map((l) => [l, `/${l}`])),
+      languages: Object.fromEntries(
+        config.languages.enabled.map((l) => [l, `/${l}`]),
+      ),
     },
+    openGraph: {
+      siteName: dict.meta.siteName,
+      title: seoTitle || dict.meta.siteName,
+      description: dict.meta.description,
+      locale,
+      ...(share ? { images: [{ url: share }] } : {}),
+    },
+    ...(config.identity.faviconPath
+      ? { icons: { icon: storageObjectUrl(config.identity.faviconPath) } }
+      : {}),
   };
 }
 
-export const viewport: Viewport = {
-  themeColor: "#15803d",
-};
+export async function generateViewport(): Promise<Viewport> {
+  const config = await getSiteConfig();
+  return { themeColor: config.theme.primary };
+}
 
 export default async function RootLayout({
   children,
 }: LayoutProps<"/[locale]">) {
-  const locale = await getLocale();
-  const dict = await getDictionary();
+  const [locale, dict, config] = await Promise.all([
+    getLocale(),
+    getDictionary(),
+    getSiteConfig(),
+  ]);
 
   return (
     <html
       lang={locale}
       dir={LOCALE_DIRECTION[locale]}
       className={`${inter.variable} ${thaana.variable} h-full antialiased`}
+      style={themeVariables(config.theme) as CSSProperties}
     >
       <body className="flex min-h-full flex-col font-sans">
         <a
@@ -60,12 +92,17 @@ export default async function RootLayout({
         >
           {dict.common.skipToContent}
         </a>
-        <SiteHeader locale={locale} dict={dict} />
+        <SiteHeader locale={locale} dict={dict} config={config} />
         <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
           {children}
         </main>
-        <SiteFooter locale={locale} dict={dict} />
-        {isSampleCatalog ? null : <TrackVisit locale={locale} />}
+        <SiteFooter locale={locale} dict={dict} config={config} />
+        {isSampleCatalog ? null : (
+          // usePathname() needs a Suspense boundary on dynamic routes.
+          <Suspense fallback={null}>
+            <SiteAnalytics />
+          </Suspense>
+        )}
       </body>
     </html>
   );
